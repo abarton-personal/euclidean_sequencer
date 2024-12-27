@@ -74,10 +74,16 @@ void onChannelButtonRelease() {
     if (pow) sev_seg_show_digit(myval);
 }
 
-Button buttons[] = {
+void onCenterButtonRelease() {
+    Serial.printf("Center (enc)\n");
+    sev_seg_display_done();
+}
+
+Button buttons[NUM_BUTTONS] = {
     {CHANNEL_BUTTON, OPEN, 0, onChannelButtonRelease},
     {START_STOP_BUTTON, OPEN, 0, onStartButtonRelease},
-    {MODE_BUTTON, OPEN, 0, onModeButtonRelease}
+    {MODE_BUTTON, OPEN, 0, onModeButtonRelease},
+    {CENTER_BUTTON, OPEN, 0, onCenterButtonRelease}
 };
 
 
@@ -107,6 +113,7 @@ void setup() {
     pinMode(CHANNEL_BUTTON, INPUT);
     pinMode(START_STOP_BUTTON, INPUT);
     pinMode(MODE_BUTTON, INPUT);
+    pinMode(CENTER_BUTTON, INPUT);
 
   sev_seg_power(true);
   rotary_encoder_init();
@@ -120,7 +127,7 @@ void loop() {
       BLEMidiServer.noteOff(0, 69, 127);        // Then we stop the note and make a delay of one second before returning to the beginning of the loop
       delay(1000);
   }
-  updateButtons(buttons, 3);
+  updateButtons(buttons, NUM_BUTTONS);
   rotary_loop();
 }
 

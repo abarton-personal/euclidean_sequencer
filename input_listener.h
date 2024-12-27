@@ -20,6 +20,7 @@ struct Button {
     ButtonCallback callback;
 };
 
+
 void updateButtons(Button* buttons, size_t numButtons);
 
 void rotary_encoder_init();

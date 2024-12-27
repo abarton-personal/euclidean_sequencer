@@ -38,6 +38,14 @@ void sev_seg_show_digit(int num){
   // TODO: implement some kind of safe delay
 }
 
+void sev_seg_display_done(){
+  display.setSegments(SEG_DONE);
+}
+
+
+
+
+
 void demo_sev_seg()
 {
   int k;

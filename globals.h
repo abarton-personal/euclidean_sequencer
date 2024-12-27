@@ -2,11 +2,11 @@
 /*************************************************************************** */
 /* PIN DEFINITIONS                                                           */
 /*************************************************************************** */
-
+#define NUM_BUTTONS         4
 #define CHANNEL_BUTTON      27 //brown
 #define START_STOP_BUTTON   26 //orange
 #define MODE_BUTTON         32 //blue
-#define CENTER_BUTTON       4//22
+#define CENTER_BUTTON       23
 
 #define ENCODER_A           16
 #define ENCODER_B           17
