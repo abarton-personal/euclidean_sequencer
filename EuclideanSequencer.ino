@@ -1,7 +1,13 @@
 #include <Arduino.h>
 #include <BLEMidi.h>
+#include "seven_seg.h"
+#include "input_listener.h"
+#include "globals.h"
 
 #define LED_BUILTIN 2
+
+static int myval = 0;
+
 
 void onNoteOn(uint8_t channel, uint8_t note, uint8_t velocity, uint16_t timestamp)
 {
@@ -47,6 +53,34 @@ void onClock(uint16_t timestamp)
     }
 }
 
+void onStartButtonRelease() {
+    Serial.printf("Start (orange)\n");
+    myval++;
+    sev_seg_show_digit(myval);
+}
+
+void onModeButtonRelease() {
+    Serial.printf("Mode (blue)\n");
+    if(myval > 0) myval--;
+    sev_seg_show_digit(myval);
+}
+
+void onChannelButtonRelease() {
+    Serial.printf("Channel (brown)\n");
+    static bool pow = true;
+    if(pow) pow = false;
+    else pow = true;
+    sev_seg_power(pow);
+    if (pow) sev_seg_show_digit(myval);
+}
+
+Button buttons[] = {
+    {CHANNEL_BUTTON, OPEN, 0, onChannelButtonRelease},
+    {START_STOP_BUTTON, OPEN, 0, onStartButtonRelease},
+    {MODE_BUTTON, OPEN, 0, onModeButtonRelease}
+};
+
+
 
 void setup() {
   Serial.begin(115200);
@@ -66,7 +100,16 @@ void setup() {
   BLEMidiServer.setPitchBendCallback(onPitchbend);
   BLEMidiServer.setMidiClockCallback(onClock);
   // BLEMidiServer.enableDebugging();
-  pinMode(LED_BUILTIN, OUTPUT);
+      // set up inputs
+    for (Button& button : buttons) {
+        pinMode(button.pin, INPUT_PULLUP);
+    }
+    pinMode(CHANNEL_BUTTON, INPUT);
+    pinMode(START_STOP_BUTTON, INPUT);
+    pinMode(MODE_BUTTON, INPUT);
+
+  sev_seg_power(true);
+  rotary_encoder_init();
   
 }
 
@@ -77,6 +120,8 @@ void loop() {
       BLEMidiServer.noteOff(0, 69, 127);        // Then we stop the note and make a delay of one second before returning to the beginning of the loop
       delay(1000);
   }
+  updateButtons(buttons, 3);
+  rotary_loop();
 }
 
 

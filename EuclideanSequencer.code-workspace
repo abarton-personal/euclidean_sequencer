@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../../Arduino/libraries/ESP32-BLE-MIDI"
+		},
+		{
+			"path": "../music/fretboard/fretboard/midi_listener"
+		}
+	],
+	"settings": {}
+}
