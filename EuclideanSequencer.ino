@@ -100,6 +100,14 @@ void onCenterButtonRelease() {
 
 }
 
+void onEncoderUp(){
+    printf("encoder up\n");
+}
+
+void onEncoderDown(){
+    printf("encoder down\n");
+}
+
 Button buttons[NUM_BUTTONS] = {
     {CHANNEL_BUTTON, OPEN, 0, onChannelButtonRelease},
     {START_STOP_BUTTON, OPEN, 0, onStartButtonRelease},
@@ -127,17 +135,22 @@ void setup() {
   BLEMidiServer.setPitchBendCallback(onPitchbend);
   BLEMidiServer.setMidiClockCallback(onClock);
   // BLEMidiServer.enableDebugging();
-      // set up inputs
-    for (Button& button : buttons) {
-        pinMode(button.pin, INPUT_PULLUP);
-    }
-    pinMode(CHANNEL_BUTTON, INPUT);
-    pinMode(START_STOP_BUTTON, INPUT);
-    pinMode(MODE_BUTTON, INPUT);
-    pinMode(CENTER_BUTTON, INPUT);
 
-  sev_seg_power(true);
+  // set up inputs
+  for (Button& button : buttons) {
+      pinMode(button.pin, INPUT_PULLUP);
+  }
+  pinMode(CHANNEL_BUTTON, INPUT);
+  pinMode(START_STOP_BUTTON, INPUT);
+  pinMode(MODE_BUTTON, INPUT);
+  pinMode(CENTER_BUTTON, INPUT);
+  // encoder
   rotary_encoder_init();
+  registerEncTurnCallback(onEncoderUp, DIRECTION_UP);
+  registerEncTurnCallback(onEncoderDown, DIRECTION_DOWN);
+
+  // seven segment display
+  sev_seg_power(true);
   
 }
 

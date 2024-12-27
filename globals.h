@@ -16,6 +16,8 @@
 
 #define LEDS_DATA_OUT       7//5
 
+#define DIRECTION_UP        true
+#define DIRECTION_DOWN      false
 
 typedef enum modes {
     EUCLIDEAN,

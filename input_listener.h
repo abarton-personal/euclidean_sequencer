@@ -23,8 +23,12 @@ struct Button {
 
 void updateButtons(Button* buttons, size_t numButtons);
 
+
+
+typedef void (*encoderCallback)();
+void registerEncTurnCallback(encoderCallback callback, bool up);
+
 void rotary_encoder_init();
-void rotary_onButtonClick();
 void rotary_loop();
 
 #endif // INPUT_LISTENER_H

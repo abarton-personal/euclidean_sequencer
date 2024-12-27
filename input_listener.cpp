@@ -5,42 +5,66 @@
 #include "Arduino.h"
 
 #define DEBOUNCE_TIME 50
-#define ENCODER_READ_INTERVAL 50
 
-#define ROTARY_ENCODER_A_PIN ENCODER_A
-#define ROTARY_ENCODER_B_PIN ENCODER_B
-#define ROTARY_ENCODER_BUTTON_PIN CENTER_BUTTON
-#define ROTARY_ENCODER_VCC_PIN -1 
-#define ROTARY_ENCODER_STEPS 4
+#define ROTARY_ENCODER_A_PIN    ENCODER_A
+#define ROTARY_ENCODER_B_PIN    ENCODER_B
+#define ROTARY_ENCODER_BUTTON_PIN  CENTER_BUTTON //doesn't matter, it's controlled like the other buttons, but the encoder init expects a value
+#define ROTARY_ENCODER_VCC_PIN  -1 
+#define ROTARY_ENCODER_STEPS    4
+#define MAX_ENC_VAL             15
+#define CIRCLE_ENC_VALUES       true
 
 AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, ROTARY_ENCODER_B_PIN, ROTARY_ENCODER_BUTTON_PIN, ROTARY_ENCODER_VCC_PIN, ROTARY_ENCODER_STEPS);
 
+encoderCallback up_callback = NULL;
+encoderCallback down_callback = NULL;
 
-// ENCODER STUFF
+
+
+/*************************************************************************** */
+/* FUNCTION DEFINITIONS                                                      */
+/*************************************************************************** */
+// ISR for encoder 
 void IRAM_ATTR readEncoderISR()
 {
 	rotaryEncoder.readEncoder_ISR();
 }
 
-
+// initialize encoder configs
 void rotary_encoder_init(){
     rotaryEncoder.begin();
 	rotaryEncoder.setup(readEncoderISR);
-    bool circleValues = true;
-	rotaryEncoder.setBoundaries(0, 16, circleValues); //minValue, maxValue, circleValues true|false (when max go to min and vice versa)
+	// rotaryEncoder.setBoundaries(0, MAX_ENC_VAL, CIRCLE_ENC_VALUES); //minValue, maxValue, circleValues true|false (when max go to min and vice versa)
     rotaryEncoder.setAcceleration(0);
 }
 
-
+// repeatedly check encoder for changes 
 void rotary_loop()
 {
-	if (rotaryEncoder.encoderChanged())
-	{
-		Serial.print("Value: ");
-		Serial.println(rotaryEncoder.readEncoder());
-	}
+    int16_t encoderDelta = rotaryEncoder.encoderChanged();
+    if (encoderDelta == 0)
+        return;
+    if (encoderDelta > 0){
+        if (up_callback != NULL) {
+            up_callback();
+        }
+    }
+    if (encoderDelta < 0){
+        if (down_callback != NULL) {
+            down_callback();
+        }
+    }
+
 }
 
+void registerEncTurnCallback(encoderCallback callback, bool up) {
+    if (up) {
+        up_callback = callback;
+    }
+    else {
+        down_callback = callback;
+    }
+}
 
 // BUTTON STUFF
 void updateButton(Button& button) {
