@@ -7,7 +7,11 @@
 #define LED_BUILTIN 2
 
 static int myval = 0;
+volatile static modes device_mode = EUCLIDEAN;
 
+void cycle_device_mode(){
+  device_mode = static_cast<modes>((device_mode + 1) % NUM_MODES);
+}
 
 void onNoteOn(uint8_t channel, uint8_t note, uint8_t velocity, uint16_t timestamp)
 {
@@ -76,7 +80,24 @@ void onChannelButtonRelease() {
 
 void onCenterButtonRelease() {
     Serial.printf("Center (enc)\n");
-    sev_seg_display_done();
+    cycle_device_mode();
+    switch(device_mode){
+      case EUCLIDEAN:
+        sev_seg_display_word(SEG_EUCL);
+        break;
+      case MANUAL_VELOCITY:
+        sev_seg_display_word(SEG_VOL);
+        break;
+      case TEMPO:
+        sev_seg_display_word(SEG_RATE);
+        break;
+      case SWING:
+        sev_seg_display_word(SEG_SHUF);
+        break;
+      default:
+        Serial.printf("Error: invalid mode\n");
+    }
+
 }
 
 Button buttons[NUM_BUTTONS] = {

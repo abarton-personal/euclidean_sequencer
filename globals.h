@@ -15,3 +15,12 @@
 #define SEV_SEG_DATA        12
 
 #define LEDS_DATA_OUT       7//5
+
+
+typedef enum modes {
+    EUCLIDEAN,
+    MANUAL_VELOCITY,
+    TEMPO,
+    SWING,
+    NUM_MODES   // sentinal value, not an actual mode
+};
