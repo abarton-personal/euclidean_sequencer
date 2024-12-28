@@ -4,11 +4,19 @@
 #include "input_listener.h"
 #include "globals.h"
 
-#define LED_BUILTIN 2
 
-static int myval = 0;
+/*************************************************************************** */
+/* Global Variables                                                         */
+/*************************************************************************** */
+static uint8_t channel = 0;
+static uint8_t max_channels = 4;
 volatile static modes device_mode = EUCLIDEAN;
+volatile static ButtState center_button_pos = OPEN;
 
+
+/*************************************************************************** */
+/* MIDI CALLBACKS                                                            */
+/*************************************************************************** */
 void cycle_device_mode(){
   device_mode = static_cast<modes>((device_mode + 1) % NUM_MODES);
 }
@@ -57,29 +65,22 @@ void onClock(uint16_t timestamp)
     }
 }
 
+/*************************************************************************** */
+/* BUTTON CALLBACKS                                                          */
+/*************************************************************************** */
+
 void onStartButtonRelease() {
     Serial.printf("Start (orange)\n");
-    myval++;
-    sev_seg_show_digit(myval);
+    static bool pow = false;
+    pow ^= 1;
+    sev_seg_power(pow);
+    if (pow){
+      sev_seg_display_word(SEG_POOP);
+    }
 }
 
 void onModeButtonRelease() {
     Serial.printf("Mode (blue)\n");
-    if(myval > 0) myval--;
-    sev_seg_show_digit(myval);
-}
-
-void onChannelButtonRelease() {
-    Serial.printf("Channel (brown)\n");
-    static bool pow = true;
-    if(pow) pow = false;
-    else pow = true;
-    sev_seg_power(pow);
-    if (pow) sev_seg_show_digit(myval);
-}
-
-void onCenterButtonRelease() {
-    Serial.printf("Center (enc)\n");
     cycle_device_mode();
     switch(device_mode){
       case EUCLIDEAN:
@@ -97,28 +98,68 @@ void onCenterButtonRelease() {
       default:
         Serial.printf("Error: invalid mode\n");
     }
-
 }
 
+void onChannelButtonRelease() {
+    Serial.printf("Channel (brown)\n");
+    if(channel >= (max_channels-1)){
+      channel = 0;
+    } else {
+      channel++;
+    }
+    sev_seg_show_digit(channel);
+}
+
+void onCenterButtonPress(){
+    Serial.printf("Center (press)\n");
+    center_button_pos = CLOSED;
+}
+
+void onCenterButtonRelease() {
+    Serial.printf("Center (release)\n");
+    center_button_pos = OPEN;
+}
+
+/*************************************************************************** */
+/* ENCODER MOVEMENT CALLBACKS                                                */
+/*************************************************************************** */
+
 void onEncoderUp(){
+    if (center_button_pos == CLOSED){
+        printf("Yeah baby burn it up!\n");
+    } else 
     printf("encoder up\n");
 }
 
 void onEncoderDown(){
+    if (center_button_pos == CLOSED){
+        printf("MMM break it down!\n");
+    } else 
     printf("encoder down\n");
 }
 
+
+/*************************************************************************** */
+/* BUTTONS (TODO: this should just go in input_listener, except the callbacks) */
+/*************************************************************************** */
+
 Button buttons[NUM_BUTTONS] = {
-    {CHANNEL_BUTTON, OPEN, 0, onChannelButtonRelease},
-    {START_STOP_BUTTON, OPEN, 0, onStartButtonRelease},
-    {MODE_BUTTON, OPEN, 0, onModeButtonRelease},
-    {CENTER_BUTTON, OPEN, 0, onCenterButtonRelease}
+    {CHANNEL_BUTTON,    OPEN, 0, NULL,                  onChannelButtonRelease},
+    {START_STOP_BUTTON, OPEN, 0, NULL,                  onStartButtonRelease},
+    {MODE_BUTTON,       OPEN, 0, NULL,                  onModeButtonRelease},
+    {CENTER_BUTTON,     OPEN, 0, onCenterButtonPress,   onCenterButtonRelease}
 };
 
 
+/*************************************************************************** */
+/* BEGIN CODE                                                                */
+/*************************************************************************** */
 
 void setup() {
+  // Serial
   Serial.begin(115200);
+
+  // initialize MIDI listener
   BLEMidiServer.begin("Euclidean Sequencer");
   BLEMidiServer.setOnConnectCallback([]() {
     Serial.println("Connected");
@@ -136,7 +177,7 @@ void setup() {
   BLEMidiServer.setMidiClockCallback(onClock);
   // BLEMidiServer.enableDebugging();
 
-  // set up inputs
+  // initialize buttons
   for (Button& button : buttons) {
       pinMode(button.pin, INPUT_PULLUP);
   }
@@ -144,15 +185,17 @@ void setup() {
   pinMode(START_STOP_BUTTON, INPUT);
   pinMode(MODE_BUTTON, INPUT);
   pinMode(CENTER_BUTTON, INPUT);
-  // encoder
+  // initialize encoder
   rotary_encoder_init();
   registerEncTurnCallback(onEncoderUp, DIRECTION_UP);
   registerEncTurnCallback(onEncoderDown, DIRECTION_DOWN);
 
-  // seven segment display
+  // initialize seven segment display
   sev_seg_power(true);
   
 }
+
+
 
 void loop() {
   if(BLEMidiServer.isConnected()) {             // If we've got a connection, we send an A4 during one second, at full velocity (127)

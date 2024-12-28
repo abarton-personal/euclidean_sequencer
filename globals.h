@@ -16,6 +16,10 @@
 
 #define LEDS_DATA_OUT       7//5
 
+/*************************************************************************** */
+/* UTILITIES                                                                 */
+/*************************************************************************** */
+
 #define DIRECTION_UP        true
 #define DIRECTION_DOWN      false
 
@@ -26,3 +30,5 @@ typedef enum modes {
     SWING,
     NUM_MODES   // sentinal value, not an actual mode
 };
+
+#define MAX_MAX_CHANNEL 16 //at some point we have to run out of memory or something.

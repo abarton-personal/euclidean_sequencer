@@ -17,7 +17,8 @@ struct Button {
     uint8_t pin;
     ButtState state;
     unsigned long timer;
-    ButtonCallback callback;
+    ButtonCallback pressCallback;
+    ButtonCallback releaseCallback;
 };
 
 

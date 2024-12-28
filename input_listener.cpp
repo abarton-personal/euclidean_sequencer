@@ -4,15 +4,15 @@
 #include "AiEsp32RotaryEncoder.h"
 #include "Arduino.h"
 
-#define DEBOUNCE_TIME 50
+#define DEBOUNCE_TIME               50
 
-#define ROTARY_ENCODER_A_PIN    ENCODER_A
-#define ROTARY_ENCODER_B_PIN    ENCODER_B
+#define ROTARY_ENCODER_A_PIN        ENCODER_A
+#define ROTARY_ENCODER_B_PIN        ENCODER_B
 #define ROTARY_ENCODER_BUTTON_PIN  CENTER_BUTTON //doesn't matter, it's controlled like the other buttons, but the encoder init expects a value
-#define ROTARY_ENCODER_VCC_PIN  -1 
-#define ROTARY_ENCODER_STEPS    4
-#define MAX_ENC_VAL             15
-#define CIRCLE_ENC_VALUES       true
+#define ROTARY_ENCODER_VCC_PIN      -1 
+#define ROTARY_ENCODER_STEPS        4
+#define MAX_ENC_VAL                 15
+#define CIRCLE_ENC_VALUES           true
 
 AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, ROTARY_ENCODER_B_PIN, ROTARY_ENCODER_BUTTON_PIN, ROTARY_ENCODER_VCC_PIN, ROTARY_ENCODER_STEPS);
 
@@ -66,6 +66,7 @@ void registerEncTurnCallback(encoderCallback callback, bool up) {
     }
 }
 
+
 // BUTTON STUFF
 void updateButton(Button& button) {
     unsigned long currentTime = millis();
@@ -80,6 +81,9 @@ void updateButton(Button& button) {
             if (currentTime - button.timer >= DEBOUNCE_TIME) {
                 if (digitalRead(button.pin) == LOW) {
                     button.state = CLOSED;
+                    if (button.pressCallback) {
+                        button.pressCallback();
+                    }
                 } else {
                     button.state = OPEN;
                 }
@@ -95,8 +99,8 @@ void updateButton(Button& button) {
             if (currentTime - button.timer >= DEBOUNCE_TIME) {
                 if (digitalRead(button.pin) == HIGH) {
                     button.state = OPEN;
-                    if (button.callback) {
-                        button.callback();
+                    if (button.releaseCallback) {
+                        button.releaseCallback();
                     }
                 } else {
                     button.state = CLOSED;
