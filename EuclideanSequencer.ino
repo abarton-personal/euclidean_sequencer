@@ -13,13 +13,80 @@ static uint8_t max_channels = 4;
 volatile static modes device_mode = EUCLIDEAN;
 volatile static ButtState center_button_pos = OPEN;
 
+static uint8_t num_beats[MAX_MAX_CHANNEL] = {0};
+static bool beats[MAX_MAX_CHANNEL][16] = {{false}};
+
+
+/*************************************************************************** */
+/* Private Functions                                                         */
+/*************************************************************************** */
+
+void euclidean(int num_points, bool* chanbeats, int size);
+
+// cycle to the next mode when mode button pressed
+void cycle_device_mode(){
+  device_mode = static_cast<modes>((device_mode + 1) % NUM_MODES);
+}
+
+// debug print the array beats[chan]
+void print_beats(uint8_t chan){
+    printf("beats for channel %d: [", channel);
+    for(int i=0; i<15; i++){
+        printf("%d, ", beats[channel][i]);
+    }
+    printf("%d]\n", beats[channel][15]);
+}
+
+// increment or decrement the number of beats for the current channel
+void inc_dec_beats(bool up){
+    if(up==true){
+        if (num_beats[channel] < MAX_BEATS){
+            num_beats[channel]++;
+        }
+        // beats[channel][num_beats[channel]-1] = true;
+    }
+    else {
+        if (num_beats[channel] > 0){
+            num_beats[channel]--;
+        }
+        // beats[channel][num_beats[channel]] = false;
+    }
+    euclidean(num_beats[channel], beats[channel], MAX_BEATS);
+    print_beats(channel);
+}
+
+void euclidean(int num_points, bool* chanbeats, int size) {
+    // First clear the array
+    for (int i = 0; i < size; i++) {
+        chanbeats[i] = false;
+    }
+    // If num_points is 0 or greater than size, nothing to do
+    if (num_points <= 0 || num_points > size) {
+        return;
+    }
+    // Special case for 1 point
+    if (num_points == 1) {
+        chanbeats[0] = true;
+        return;
+    }
+    // Calculate the spacing between num_points
+    float spacing = (float)size / num_points;
+    float position = 0;
+    
+    // Place each point
+    for (int i = 0; i < num_points; i++) {
+        // Round to nearest integer position
+        int index = (int)(position + 0.5);
+        if (index >= size) index = 0;  // Wrap around if needed
+        
+        chanbeats[index] = true;
+        position += spacing;
+    }
+}
 
 /*************************************************************************** */
 /* MIDI CALLBACKS                                                            */
 /*************************************************************************** */
-void cycle_device_mode(){
-  device_mode = static_cast<modes>((device_mode + 1) % NUM_MODES);
-}
 
 void onNoteOn(uint8_t channel, uint8_t note, uint8_t velocity, uint16_t timestamp)
 {
@@ -108,6 +175,7 @@ void onChannelButtonRelease() {
       channel++;
     }
     sev_seg_show_digit(channel);
+    print_beats(channel);
 }
 
 void onCenterButtonPress(){
@@ -129,6 +197,7 @@ void onEncoderUp(){
         printf("Yeah baby burn it up!\n");
     } else 
     printf("encoder up\n");
+    inc_dec_beats(INCREMENT);
 }
 
 void onEncoderDown(){
@@ -136,6 +205,7 @@ void onEncoderDown(){
         printf("MMM break it down!\n");
     } else 
     printf("encoder down\n");
+    inc_dec_beats(DECREMENT);
 }
 
 

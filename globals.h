@@ -22,6 +22,8 @@
 
 #define DIRECTION_UP        true
 #define DIRECTION_DOWN      false
+#define INCREMENT           true
+#define DECREMENT           false
 
 typedef enum modes {
     EUCLIDEAN,
@@ -31,4 +33,5 @@ typedef enum modes {
     NUM_MODES   // sentinal value, not an actual mode
 };
 
-#define MAX_MAX_CHANNEL 16 //at some point we have to run out of memory or something.
+#define MAX_MAX_CHANNEL 4 //at some point we have to run out of memory or something.
+#define MAX_BEATS 16
