@@ -12,6 +12,7 @@ static uint8_t channel = 0;
 static uint8_t max_channels = 4;
 volatile static modes device_mode = EUCLIDEAN;
 volatile static ButtState center_button_pos = OPEN;
+static uint8_t custom_tempo = 120;
 
 static uint8_t num_beats[MAX_MAX_CHANNEL] = {0};
 static bool beats[MAX_MAX_CHANNEL][16] = {{false}};
@@ -22,6 +23,7 @@ static bool beats[MAX_MAX_CHANNEL][16] = {{false}};
 /*************************************************************************** */
 
 void euclidean(int num_points, bool* chanbeats, int size);
+void rotate_beats(bool up);
 
 // cycle to the next mode when mode button pressed
 void cycle_device_mode(){
@@ -43,13 +45,11 @@ void inc_dec_beats(bool up){
         if (num_beats[channel] < MAX_BEATS){
             num_beats[channel]++;
         }
-        // beats[channel][num_beats[channel]-1] = true;
     }
     else {
         if (num_beats[channel] > 0){
             num_beats[channel]--;
         }
-        // beats[channel][num_beats[channel]] = false;
     }
     euclidean(num_beats[channel], beats[channel], MAX_BEATS);
     print_beats(channel);
@@ -82,6 +82,27 @@ void euclidean(int num_points, bool* chanbeats, int size) {
         chanbeats[index] = true;
         position += spacing;
     }
+}
+
+void rotate_beats(bool up){
+    // rotate clockwise
+    if(up){
+        bool tmp = beats[channel][MAX_BEATS-1];
+        for(int i=MAX_BEATS-1; i>=1; i--){
+            beats[channel][i] = beats[channel][i-1];
+        }
+        beats[channel][0] = tmp;
+    }
+
+    // rotate counter-clockwise
+    else{
+        bool tmp = beats[channel][0];
+        for(int i=0; i<=MAX_BEATS-2; i++){
+            beats[channel][i] = beats[channel][i+1];
+        }
+        beats[channel][MAX_BEATS-1] = tmp;
+    }
+    print_beats(channel);
 }
 
 /*************************************************************************** */
@@ -150,20 +171,20 @@ void onModeButtonRelease() {
     Serial.printf("Mode (blue)\n");
     cycle_device_mode();
     switch(device_mode){
-      case EUCLIDEAN:
-        sev_seg_display_word(SEG_EUCL);
-        break;
-      case MANUAL_VELOCITY:
-        sev_seg_display_word(SEG_VOL);
-        break;
-      case TEMPO:
-        sev_seg_display_word(SEG_RATE);
-        break;
-      case SWING:
-        sev_seg_display_word(SEG_SHUF);
-        break;
-      default:
-        Serial.printf("Error: invalid mode\n");
+        case EUCLIDEAN:
+            sev_seg_display_word(SEG_EUCL);
+            break;
+        case MANUAL_VELOCITY:
+            sev_seg_display_word(SEG_VOL);
+            break;
+        case TEMPO:
+            sev_seg_display_word(SEG_RATE);
+            break;
+        case SWING:
+            sev_seg_display_word(SEG_SHUF);
+            break;
+        default:
+            Serial.printf("Error: invalid mode\n");
     }
 }
 
@@ -193,19 +214,41 @@ void onCenterButtonRelease() {
 /*************************************************************************** */
 
 void onEncoderUp(){
-    if (center_button_pos == CLOSED){
-        printf("Yeah baby burn it up!\n");
-    } else 
-    printf("encoder up\n");
-    inc_dec_beats(INCREMENT);
+    switch(device_mode){
+        case EUCLIDEAN:
+            if (center_button_pos == CLOSED)
+                rotate_beats(INCREMENT);
+            else 
+                inc_dec_beats(INCREMENT);
+            break;
+        case MANUAL_VELOCITY:
+            break;
+        case TEMPO:
+            break;
+        case SWING:
+            break;
+        default:
+            Serial.printf("Error: invalid mode\n");
+    }
 }
 
 void onEncoderDown(){
-    if (center_button_pos == CLOSED){
-        printf("MMM break it down!\n");
-    } else 
-    printf("encoder down\n");
-    inc_dec_beats(DECREMENT);
+    switch(device_mode){
+        case EUCLIDEAN:
+            if (center_button_pos == CLOSED)
+                rotate_beats(DECREMENT);
+            else 
+                inc_dec_beats(DECREMENT);
+            break;
+        case MANUAL_VELOCITY:
+            break;
+        case TEMPO:
+            break;
+        case SWING:
+            break;
+        default:
+            Serial.printf("Error: invalid mode\n");
+    }
 }
 
 
