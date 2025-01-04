@@ -24,6 +24,8 @@
 #define DIRECTION_DOWN      false
 #define INCREMENT           true
 #define DECREMENT           false
+#define START               true
+#define STOP                false            
 
 typedef enum modes {
     EUCLIDEAN,
@@ -33,5 +35,17 @@ typedef enum modes {
     NUM_MODES   // sentinal value, not an actual mode
 };
 
+typedef enum playback_states {
+    PLAYBACK_IDLE,
+    PLAYBACK_START,
+    PLAYBACK_PLAYING,
+    PLAYBACK_STOP,
+    PLAYBACK_OVERRIDE,
+};
+
 #define MAX_MAX_CHANNEL 4 //at some point we have to run out of memory or something.
-#define MAX_BEATS 16
+#define MAX_BEATS       16
+#define MAX_TEMPO       220
+#define MIN_TEMPO       40
+
+#define BPM_TO_MS(X)    (15000 / X)  // period = (60 s/min) * (1000 ms/s) / (tempo in bpm) / (4 subdivisions/beat)
