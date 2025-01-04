@@ -125,7 +125,30 @@ void increase_tempo(int mod){
 
 
 void send_midi_notes(uint8_t which_beat){
-    sev_seg_show_digit(which_beat);
+    // sev_seg_show_digit(which_beat);
+    if (BLEMidiServer.isConnected()){
+        for (int chan=0; chan<max_channels; chan++){
+            // first send MIDI OFF for previous beat if it was on
+            int prev_beat = (which_beat > 0 ? which_beat : (MAX_BEATS-1));
+            if(beats[chan][prev_beat]){
+                BLEMidiServer.noteOff(0, (36+chan), 127);
+            }
+            // then send MIDI ON for this note
+            if(beats[chan][which_beat]){
+                // midi channel 0, note 24 (C2), velocity 127.
+                // TODO: make these adjustable somehow
+                BLEMidiServer.noteOn(0, (36+chan), 127);
+            }
+        }
+    }
+}
+
+void terminate_all_midi(){
+    if (BLEMidiServer.isConnected()){
+        for (int chan=0; chan<max_channels; chan++){
+            BLEMidiServer.noteOff(0, (24+chan), 127);
+        }
+    }
 }
 
 void start_stop_playback(bool start){
@@ -173,6 +196,7 @@ void keep_time(){
             }
             break;
         case PLAYBACK_STOP:
+            terminate_all_midi();
             pbs = PLAYBACK_IDLE;
             break;
         case PLAYBACK_OVERRIDE:
@@ -240,12 +264,7 @@ void onClock(uint16_t timestamp)
 /*************************************************************************** */
 
 void onStartButtonRelease() {
-    // static bool pow = false;
-    // pow ^= 1;
-    // sev_seg_power(pow);
-    // if (pow){
-    //   sev_seg_display_word(SEG_POOP);
-    // }
+
     if (get_playback_state() == PLAYBACK_IDLE){
         start_stop_playback(START);
         Serial.printf("Start (orange)\n");
@@ -402,12 +421,12 @@ void setup() {
 
 
 void loop() {
-  if(BLEMidiServer.isConnected()) {             // If we've got a connection, we send an A4 during one second, at full velocity (127)
-      BLEMidiServer.noteOn(0, 69, 127);
-      delay(1000);
-      BLEMidiServer.noteOff(0, 69, 127);        // Then we stop the note and make a delay of one second before returning to the beginning of the loop
-      delay(1000);
-  }
+//   if(BLEMidiServer.isConnected()) {             // If we've got a connection, we send an A4 during one second, at full velocity (127)
+//       BLEMidiServer.noteOn(0, 69, 127);
+//       delay(1000);
+//       BLEMidiServer.noteOff(0, 69, 127);        // Then we stop the note and make a delay of one second before returning to the beginning of the loop
+//       delay(1000);
+//   }
   updateButtons(buttons, NUM_BUTTONS);
   rotary_loop();
   keep_time();
