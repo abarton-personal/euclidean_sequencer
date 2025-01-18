@@ -14,7 +14,7 @@
 #define SEV_SEG_CLK         14
 #define SEV_SEG_DATA        12
 
-#define LEDS_DATA_OUT       7//5
+#define LEDS_DATA_OUT       22
 
 /*************************************************************************** */
 /* UTILITIES                                                                 */
@@ -47,5 +47,6 @@ typedef enum playback_states {
 #define MAX_BEATS       16
 #define MAX_TEMPO       220
 #define MIN_TEMPO       40
+#define NUM_LEDS        MAX_BEATS
 
 #define BPM_TO_MS(X)    (15000 / X)  // period = (60 s/min) * (1000 ms/s) / (tempo in bpm) / (4 subdivisions/beat)

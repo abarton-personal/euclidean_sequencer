@@ -3,6 +3,7 @@
 #include "seven_seg.h"
 #include "input_listener.h"
 #include "globals.h"
+#include "led_wheel.h"
 
 
 /*************************************************************************** */
@@ -25,7 +26,7 @@ static bool beats[MAX_MAX_CHANNEL][16] = {{false}};
 
 
 /*************************************************************************** */
-/* Private Functions                                                         */
+/* Private Function Declarations                                             */
 /*************************************************************************** */
 
 void euclidean(int num_points, bool* chanbeats, int size);
@@ -33,6 +34,11 @@ void rotate_beats(bool up);
 void increase_tempo(int mod);
 void send_midi_notes(uint8_t which_beat);
 playback_states get_playback_state();
+
+
+/*************************************************************************** */
+/* Private Function Definitions                                              */
+/*************************************************************************** */
 
 // cycle to the next mode when mode button pressed
 void cycle_device_mode(){
@@ -415,6 +421,8 @@ void setup() {
 
   // initialize seven segment display
   sev_seg_power(true);
+
+  init_leds();
   
 }
 
@@ -436,3 +444,15 @@ void loop() {
 
 
 
+
+
+// TODO:
+// 1. clean up a little. MIDI and clock stuff can maybe go in its own file. standardize naming conventions.
+// 2. sync with clock in
+// 3. beats should be int velocity instead of on/off bools
+// 4. manual velocity mode
+// 5. test a USB MIDI library - can't find one. BLE it is.
+// 6. shuffle mode
+// 7. Store multiple measures?
+// 8. wire and test leds - different color per channel, beat tracer
+// 9. learn to power off sev seg, design PCB
