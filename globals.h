@@ -1,3 +1,5 @@
+#ifndef GLOBALS_H
+#define GLOBALS_H
 
 /*************************************************************************** */
 /* PIN DEFINITIONS                                                           */
@@ -11,10 +13,10 @@
 #define ENCODER_A           16
 #define ENCODER_B           17
 
-#define SEV_SEG_CLK         14
-#define SEV_SEG_DATA        12
+#define SEV_SEG_CLK         22
+#define SEV_SEG_DATA        21
 
-#define LEDS_DATA_OUT       22
+#define LEDS_DATA_OUT       14
 
 /*************************************************************************** */
 /* UTILITIES                                                                 */
@@ -43,10 +45,15 @@ typedef enum playback_states {
     PLAYBACK_OVERRIDE,
 };
 
-#define MAX_MAX_CHANNEL 4 //at some point we have to run out of memory or something.
+#define MAX_MAX_CHANNEL 8 //at some point we have to run out of memory or something.
 #define MAX_BEATS       16
 #define MAX_TEMPO       220
 #define MIN_TEMPO       40
 #define NUM_LEDS        MAX_BEATS
+#define BEAT_NONE       -1
 
 #define BPM_TO_MS(X)    (15000 / X)  // period = (60 s/min) * (1000 ms/s) / (tempo in bpm) / (4 subdivisions/beat)
+
+
+
+#endif

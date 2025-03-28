@@ -22,7 +22,7 @@ static bool start_playback_fl = false;
 static bool stop_playback_fl = false;
 
 static uint8_t num_beats[MAX_MAX_CHANNEL] = {0};
-static bool beats[MAX_MAX_CHANNEL][16] = {{false}};
+static bool beats[MAX_MAX_CHANNEL][MAX_BEATS] = {{false}};
 
 
 /*************************************************************************** */
@@ -47,6 +47,7 @@ void cycle_device_mode(){
 
 // debug print the array beats[chan]
 void print_beats(uint8_t chan){
+    leds_show_playback(beats, chan, measure_counter);
     printf("beats for channel %d: [", channel);
     for(int i=0; i<15; i++){
         printf("%d, ", beats[channel][i]);
@@ -184,6 +185,7 @@ void keep_time(){
             last_downbeat_time = millis();
             measure_counter = 0;
             send_midi_notes(measure_counter++);
+            leds_show_playback(beats, channel, measure_counter);
             pbs = PLAYBACK_PLAYING;
             break;
         case PLAYBACK_PLAYING:
@@ -195,6 +197,8 @@ void keep_time(){
                 if(measure_counter >= MAX_BEATS){
                     measure_counter = 0;
                 }
+                // update LEDs
+                leds_show_playback(beats, channel, measure_counter);
             }
             if (stop_playback_fl){
                 pbs = PLAYBACK_STOP;
@@ -203,6 +207,8 @@ void keep_time(){
             break;
         case PLAYBACK_STOP:
             terminate_all_midi();
+            measure_counter = BEAT_NONE;
+            leds_show_playback(beats, channel, measure_counter);
             pbs = PLAYBACK_IDLE;
             break;
         case PLAYBACK_OVERRIDE:
@@ -420,6 +426,7 @@ void setup() {
   registerEncTurnCallback(onEncoderDown, DIRECTION_DOWN);
 
   // initialize seven segment display
+  delay(100);
   sev_seg_power(true);
 
   init_leds();
