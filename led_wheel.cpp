@@ -17,7 +17,7 @@ CRGB chan_colors[MAX_MAX_CHANNEL] = {
 
 void init_leds(){
     FastLED.addLeds<NEOPIXEL, LEDS_DATA_OUT>(rgbleds, NUM_LEDS);  // GRB ordering is assumed
-    FastLED.setBrightness(100); 
+    FastLED.setBrightness(20); 
 }
 
 void leds_show_playback(bool (*beatsarray)[MAX_BEATS], int chan, int beatnum){

@@ -5,9 +5,9 @@
 /* PIN DEFINITIONS                                                           */
 /*************************************************************************** */
 #define NUM_BUTTONS         4
-#define CHANNEL_BUTTON      27 //brown
-#define START_STOP_BUTTON   26 //orange
-#define MODE_BUTTON         32 //blue
+#define CHANNEL_BUTTON      26
+#define START_STOP_BUTTON   32
+#define MODE_BUTTON         27
 #define CENTER_BUTTON       23
 
 #define ENCODER_A           16

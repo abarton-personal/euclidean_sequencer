@@ -462,4 +462,5 @@ void loop() {
 // 6. shuffle mode
 // 7. Store multiple measures?
 // 8. wire and test leds - different color per channel, beat tracer
-// 9. learn to power off sev seg, design PCB
+// 9. at startup clear LEDs and do a little dance 
+// 10. multi channel or multi note toggle
