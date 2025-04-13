@@ -15,6 +15,7 @@ volatile static modes device_mode = EUCLIDEAN;
 volatile static ButtState center_button_pos = OPEN;
 
 static uint8_t custom_tempo = 120;
+static int8_t custom_swing = 0;
 static uint32_t time_per_beat_ms = BPM_TO_MS(custom_tempo);
 static uint8_t measure_counter = 0;
 static playback_states pbs = PLAYBACK_IDLE;
@@ -130,6 +131,13 @@ void increase_tempo(int mod){
     sev_seg_show_digit(custom_tempo);
 }
 
+void increase_swing(int mod){
+    custom_swing += mod;
+    if (custom_swing < 0) custom_swing = 0;
+    if (custom_swing > 100) custom_swing = 100;
+    sev_seg_show_digit(custom_swing);
+}
+
 
 void send_midi_notes(uint8_t which_beat){
     // sev_seg_show_digit(which_beat);
@@ -189,7 +197,10 @@ void keep_time(){
             pbs = PLAYBACK_PLAYING;
             break;
         case PLAYBACK_PLAYING:
-            if (millis() - last_downbeat_time >= time_per_beat_ms){
+            // calculate swing offset - positive for odd beats, shorter for even
+            swing_offset = time_per_beat_ms * swing_offset / 100;
+            if (measure_counter % 2) swing_offset *= -1;
+            if (millis() - last_downbeat_time >= (time_per_beat_ms + swing_offset)){
                 // if it's time, play the next set of notes
                 last_downbeat_time += time_per_beat_ms;
                 send_midi_notes(measure_counter++);
@@ -347,6 +358,7 @@ void onEncoderUp(){
             increase_tempo(1);
             break;
         case SWING:
+        increase_swing(1);
             break;
         default:
             Serial.printf("Error: invalid mode\n");
@@ -367,6 +379,7 @@ void onEncoderDown(){
             increase_tempo(-1);
             break;
         case SWING:
+        increase_swing(-1);
             break;
         default:
             Serial.printf("Error: invalid mode\n");
