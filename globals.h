@@ -42,7 +42,14 @@ typedef enum playback_states {
     PLAYBACK_START,
     PLAYBACK_PLAYING,
     PLAYBACK_STOP,
-    PLAYBACK_OVERRIDE,
+    PLAYBACK_OVERRIDE
+};
+
+typedef enum midi_chan_split_type {
+    // each sequencer channel corresponds to one note on MIDI channel 0.
+    NOTE_PER_CHAN,
+    // each sequencer channel corresponds to a different channel.
+    CHAN_PER_CHAN
 };
 
 #define MAX_MAX_CHANNEL 8 //at some point we have to run out of memory or something.

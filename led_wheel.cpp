@@ -8,7 +8,7 @@ CRGB chan_colors[MAX_MAX_CHANNEL] = {
     CRGB::Red,
     CRGB::Blue,
     CRGB::Green,
-    CRGB::Salmon,
+    CRGB::Pink,
     CRGB::Cyan,
     CRGB::Olive,
     CRGB::Lavender,
@@ -51,6 +51,7 @@ void reset_leds(){
     for (int i=0; i<NUM_LEDS; i++){
         rgbleds[i] = CRGB::Black;
     }
+    FastLED.show();
 }
 
 
@@ -58,9 +59,11 @@ void do_a_barrel_roll(){
     int prev_led = 0;
     for (int j=0; j<3; j++)
         for (int i=0; i<NUM_LEDS; i++){
-            rgbleds[i] = chan_colors(j);
+            rgbleds[i] = chan_colors[j];
             if (i == 0) prev_led = NUM_LEDS-1;
+            else prev_led = i-1;
             rgbleds[prev_led] = CRGB::Black;
+            FastLED.show();
             delay(80);
         }
 

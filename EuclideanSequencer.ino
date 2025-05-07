@@ -9,22 +9,39 @@
 /*************************************************************************** */
 /* Global Variables                                                         */
 /*************************************************************************** */
+// the currently active channel
 static uint8_t channel = 0;
+// max number of channels to cycle through. This can be adjusted up to MAX_MAX_CHANNELS
 static uint8_t max_channels = 4;
+// currently active mode
 volatile static modes device_mode = EUCLIDEAN;
+// certain actions depend on whether the center button is held down or not
 volatile static ButtState center_button_pos = OPEN;
 
+// tempo that is used. This is overridden by MIDI sync clicks from DAW
 static uint8_t custom_tempo = 120;
+// how much to swing. 0 is straight 16ths, 50 is heavily swing, 100 completely skips every other note
 static int8_t custom_swing = 0;
+// period between beats, calculated form BPM
 static uint32_t time_per_beat_ms = BPM_TO_MS(custom_tempo);
-static uint8_t measure_counter = 0;
+// which of the 16 beats is being played right now
+static uint8_t measure_counter = -1;
+// playback state machine state
 static playback_states pbs = PLAYBACK_IDLE;
+// flags to start and stop playback
 static bool start_playback_fl = false;
 static bool stop_playback_fl = false;
 
+// how many beats are currently "on" for each channel
 static uint8_t num_beats[MAX_MAX_CHANNEL] = {0};
+// 2D array to hold the on and off beats for each channel
 static bool beats[MAX_MAX_CHANNEL][MAX_BEATS] = {{false}};
 
+// whether each channel is a different MIDI channel, or dif
+static midi_chan_split_type midi_chan_split = NOTE_PER_CHAN;
+// MIDI note sent by channel 1 when sending NOTE_PER_CHAN
+// 36 = C2 which is usually the kick drum on a drum pad
+static int base_note = 36;
 
 /*************************************************************************** */
 /* Private Function Declarations                                             */
@@ -33,7 +50,9 @@ static bool beats[MAX_MAX_CHANNEL][MAX_BEATS] = {{false}};
 void euclidean(int num_points, bool* chanbeats, int size);
 void rotate_beats(bool up);
 void increase_tempo(int mod);
+void increase_swing(int mod);
 void send_midi_notes(uint8_t which_beat);
+void toggle_midi_chan_split();
 playback_states get_playback_state();
 
 
@@ -101,6 +120,7 @@ void euclidean(int num_points, bool* chanbeats, int size) {
     }
 }
 
+
 void rotate_beats(bool up){
     // rotate clockwise
     if(up){
@@ -131,6 +151,7 @@ void increase_tempo(int mod){
     sev_seg_show_digit(custom_tempo);
 }
 
+
 void increase_swing(int mod){
     custom_swing += mod;
     if (custom_swing < 0) custom_swing = 0;
@@ -146,17 +167,17 @@ void send_midi_notes(uint8_t which_beat){
             // first send MIDI OFF for previous beat if it was on
             int prev_beat = (which_beat > 0 ? which_beat : (MAX_BEATS-1));
             if(beats[chan][prev_beat]){
-                BLEMidiServer.noteOff(0, (36+chan), 127);
+                BLEMidiServer.noteOff(0, (base_note+chan), 127);
             }
             // then send MIDI ON for this note
             if(beats[chan][which_beat]){
                 // midi channel 0, note 24 (C2), velocity 127.
-                // TODO: make these adjustable somehow
-                BLEMidiServer.noteOn(0, (36+chan), 127);
+                BLEMidiServer.noteOn(0, (base_note+chan), 127);
             }
         }
     }
 }
+
 
 void terminate_all_midi(){
     if (BLEMidiServer.isConnected()){
@@ -165,6 +186,7 @@ void terminate_all_midi(){
         }
     }
 }
+
 
 void start_stop_playback(bool start){
     if (start){
@@ -178,8 +200,10 @@ void start_stop_playback(bool start){
     
 }
 
+
 void keep_time(){
     static unsigned long last_downbeat_time;
+    static unsigned long swing_offset = 0;
 
     switch (pbs){
         case PLAYBACK_IDLE:
@@ -197,19 +221,22 @@ void keep_time(){
             pbs = PLAYBACK_PLAYING;
             break;
         case PLAYBACK_PLAYING:
-            // calculate swing offset - positive for odd beats, shorter for even
-            swing_offset = time_per_beat_ms * swing_offset / 100;
+            // calculate swing offset - positive for odd beats, negative for even
+            swing_offset = time_per_beat_ms * custom_swing / 100;
             if (measure_counter % 2) swing_offset *= -1;
+
             if (millis() - last_downbeat_time >= (time_per_beat_ms + swing_offset)){
-                // if it's time, play the next set of notes
-                last_downbeat_time += time_per_beat_ms;
-                send_midi_notes(measure_counter++);
-                // loop back to beginning of measure
-                if(measure_counter >= MAX_BEATS){
-                    measure_counter = 0;
-                }
                 // update LEDs
                 leds_show_playback(beats, channel, measure_counter);
+                send_midi_notes(measure_counter);
+                // if it's time, play the next set of notes
+                last_downbeat_time += time_per_beat_ms + swing_offset;
+                // loop back to beginning of measure
+                measure_counter++;
+                if(measure_counter >= MAX_BEATS){
+                    measure_counter = 0;
+                } 
+
             }
             if (stop_playback_fl){
                 pbs = PLAYBACK_STOP;
@@ -358,7 +385,7 @@ void onEncoderUp(){
             increase_tempo(1);
             break;
         case SWING:
-        increase_swing(1);
+            increase_swing(1);
             break;
         default:
             Serial.printf("Error: invalid mode\n");
@@ -379,7 +406,7 @@ void onEncoderDown(){
             increase_tempo(-1);
             break;
         case SWING:
-        increase_swing(-1);
+            increase_swing(-1);
             break;
         default:
             Serial.printf("Error: invalid mode\n");
@@ -453,8 +480,6 @@ void loop() {
   rotary_loop();
   keep_time();
 }
-
-
 
 
 
