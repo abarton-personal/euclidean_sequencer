@@ -20,12 +20,14 @@ volatile static ButtState center_button_pos = OPEN;
 
 // tempo that is used. This is overridden by MIDI sync clicks from DAW
 static uint8_t custom_tempo = 120;
-// how much to swing. 0 is straight 16ths, 50 is heavily swing, 100 completely skips every other note
-static int8_t custom_swing = 0;
+// how much to swing. 0 is straight 16ths / no swing
+static int16_t swing_offset = 0;
 // period between beats, calculated form BPM
 static uint32_t time_per_beat_ms = BPM_TO_MS(custom_tempo);
+static uint32_t time_per_sync_pulse = time_per_beat_ms / 6;
 // which of the 16 beats is being played right now
-static uint8_t measure_counter = -1;
+static uint8_t measure_counter = BEAT_NONE;
+static uint8_t sync_pulses = 0;
 // playback state machine state
 static playback_states pbs = PLAYBACK_IDLE;
 // flags to start and stop playback
@@ -53,6 +55,7 @@ void increase_tempo(int mod);
 void increase_swing(int mod);
 void send_midi_notes(uint8_t which_beat);
 void toggle_midi_chan_split();
+void next_pulse();
 playback_states get_playback_state();
 
 
@@ -148,15 +151,16 @@ void increase_tempo(int mod){
     if (custom_tempo > MAX_TEMPO) custom_tempo = MAX_TEMPO;
     if (custom_tempo < MIN_TEMPO) custom_tempo = MIN_TEMPO;
     time_per_beat_ms = BPM_TO_MS(custom_tempo);
+    time_per_sync_pulse = time_per_beat_ms / 6;
     sev_seg_show_digit(custom_tempo);
 }
 
 
 void increase_swing(int mod){
-    custom_swing += mod;
-    if (custom_swing < 0) custom_swing = 0;
-    if (custom_swing > 100) custom_swing = 100;
-    sev_seg_show_digit(custom_swing);
+    swing_offset += mod;
+    if (swing_offset < -4) swing_offset = -4;
+    if (swing_offset > 4) swing_offset = 4;
+    sev_seg_show_digit(swing_offset);
 }
 
 
@@ -202,8 +206,8 @@ void start_stop_playback(bool start){
 
 
 void keep_time(){
+    unsigned long now;
     static unsigned long last_downbeat_time;
-    static unsigned long swing_offset = 0;
 
     switch (pbs){
         case PLAYBACK_IDLE:
@@ -216,27 +220,15 @@ void keep_time(){
             // play downbeat and start internal clock
             last_downbeat_time = millis();
             measure_counter = 0;
-            send_midi_notes(measure_counter++);
-            leds_show_playback(beats, channel, measure_counter);
+            sync_pulses = 0;
+            next_pulse();
             pbs = PLAYBACK_PLAYING;
             break;
         case PLAYBACK_PLAYING:
-            // calculate swing offset - positive for odd beats, negative for even
-            swing_offset = time_per_beat_ms * custom_swing / 100;
-            if (measure_counter % 2) swing_offset *= -1;
-
-            if (millis() - last_downbeat_time >= (time_per_beat_ms + swing_offset)){
-                // update LEDs
-                leds_show_playback(beats, channel, measure_counter);
-                send_midi_notes(measure_counter);
-                // if it's time, play the next set of notes
-                last_downbeat_time += time_per_beat_ms + swing_offset;
-                // loop back to beginning of measure
-                measure_counter++;
-                if(measure_counter >= MAX_BEATS){
-                    measure_counter = 0;
-                } 
-
+            now = millis();
+            if (now - last_downbeat_time >= time_per_sync_pulse){
+                next_pulse();
+                last_downbeat_time = now;
             }
             if (stop_playback_fl){
                 pbs = PLAYBACK_STOP;
@@ -246,12 +238,42 @@ void keep_time(){
         case PLAYBACK_STOP:
             terminate_all_midi();
             measure_counter = BEAT_NONE;
+            sync_pulses = 0;
             leds_show_playback(beats, channel, measure_counter);
             pbs = PLAYBACK_IDLE;
             break;
         case PLAYBACK_OVERRIDE:
             // do nothing - clock is controlled by MIDI callbacks.
             break;
+    }
+}
+
+void next_pulse(){
+
+    // Serial.printf("beat (%d)\n", sync_pulses);
+    // downbeat and 8th notes
+    if (sync_pulses == 0 || sync_pulses == 12 || sync_pulses == 24){
+        leds_show_playback(beats, channel, measure_counter);
+        send_midi_notes(measure_counter);
+        // Serial.printf("measure_counter (%d)\n", measure_counter);
+        measure_counter++;
+    }
+
+    // off beats
+    else if (sync_pulses == 6+swing_offset || sync_pulses == 18+swing_offset ){
+        // Serial.printf("beat (%d)\n", sync_pulses);
+        leds_show_playback(beats, channel, measure_counter);
+        send_midi_notes(measure_counter);
+        // Serial.printf("measure_counter (%d)\n", measure_counter);
+        measure_counter++;
+    }
+
+    sync_pulses++;
+    if(sync_pulses >= 24){
+        sync_pulses -= 24;
+        if(measure_counter >= MAX_BEATS-1){
+            measure_counter = 0;
+        }
     }
 }
 
@@ -301,12 +323,21 @@ void onPitchbend(uint8_t channel, uint16_t value, uint16_t timestamp)
 }
 void onClock(uint16_t timestamp)
 {
-    static uint16_t beat = 0;
-    beat++;
-    if(beat > 96){
-        beat -= 96;
-        Serial.printf("Clock beat %d\n", beat);
-    }
+    next_pulse();
+}
+void onClockStart(uint16_t timestamp)
+{
+    Serial.printf("Clock start (timestamp %dms)\n", timestamp);
+    measure_counter = BEAT_NONE;
+    sync_pulses = 0;
+    next_pulse();
+}
+
+void onClockStop(uint16_t timestamp)
+{
+    Serial.printf("Clock stop (timestamp %dms)\n", timestamp);
+    measure_counter = BEAT_NONE;
+    sync_pulses = 0;
 }
 
 /*************************************************************************** */
@@ -450,7 +481,10 @@ void setup() {
   BLEMidiServer.setAfterTouchCallback(onAfterTouch);
   BLEMidiServer.setPitchBendCallback(onPitchbend);
   BLEMidiServer.setMidiClockCallback(onClock);
-  // BLEMidiServer.enableDebugging();
+  BLEMidiServer.setMidiStartCallback(onClockStart);
+  BLEMidiServer.setMidiStopCallback(onClockStop);
+  
+//   BLEMidiServer.enableDebugging();
 
   // initialize buttons
   for (Button& button : buttons) {
@@ -466,6 +500,8 @@ void setup() {
   registerEncTurnCallback(onEncoderDown, DIRECTION_DOWN);
 
   // initialize seven segment display
+  delay(100);
+  sev_seg_power(false);
   delay(100);
   sev_seg_power(true);
 

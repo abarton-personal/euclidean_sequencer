@@ -64,7 +64,7 @@ void do_a_barrel_roll(){
             else prev_led = i-1;
             rgbleds[prev_led] = CRGB::Black;
             FastLED.show();
-            delay(80);
+            delay(50);
         }
 
     reset_leds();

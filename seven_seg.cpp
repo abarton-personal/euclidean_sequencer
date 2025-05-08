@@ -26,7 +26,7 @@ void sev_seg_power(bool on){
 }
 
 void sev_seg_show_digit(int num){
-  if(num < 0 || num > 9999){
+  if(num < -999 || num > 9999){
     return;
   }
   display.showNumberDec(num, false);
