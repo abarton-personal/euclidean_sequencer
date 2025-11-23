@@ -1,6 +1,8 @@
 #include "led_wheel.h"
 #include "globals.h"
+#include <Arduino.h>
 
+#define MIN_UPDATE_INTERVAL 30
 
 CRGB rgbleds[NUM_LEDS];
 
@@ -15,6 +17,10 @@ CRGB chan_colors[MAX_MAX_CHANNEL] = {
     CRGB::Peru
 };
 
+static bool change_requested = false;
+static unsigned long update_time;
+
+
 // private function declarations
 void do_a_barrel_roll();
 void reset_leds();
@@ -27,8 +33,18 @@ void init_leds(){
     FastLED.setBrightness(10);
     reset_leds();
     do_a_barrel_roll();
+    update_time = millis();
 }
 
+void led_tasks(){
+    if (millis() - update_time > MIN_UPDATE_INTERVAL){
+        if (change_requested){
+            FastLED.show();
+            update_time = millis();
+            change_requested = false;
+        }
+    }
+}
 
 void leds_show_playback(bool (*beatsarray)[MAX_BEATS], int chan, int beatnum){
     // light up selected beats, turn off unselected
@@ -42,7 +58,8 @@ void leds_show_playback(bool (*beatsarray)[MAX_BEATS], int chan, int beatnum){
     // also light up the current beat in the measure
     if (beatnum >= 0 && beatnum < MAX_BEATS)
         rgbleds[beatnum] = CRGB::White;
-    FastLED.show();
+    // FastLED.show();
+    change_requested = true;
 }
 
 // private function definitions
@@ -69,3 +86,4 @@ void do_a_barrel_roll(){
 
     reset_leds();
 }
+

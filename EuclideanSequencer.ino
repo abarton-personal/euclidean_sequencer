@@ -4,7 +4,7 @@
 #include "input_listener.h"
 #include "globals.h"
 #include "led_wheel.h"
-
+using namespace std;
 
 /*************************************************************************** */
 /* Global Variables                                                         */
@@ -17,6 +17,11 @@ static uint8_t max_channels = 4;
 volatile static modes device_mode = EUCLIDEAN;
 // certain actions depend on whether the center button is held down or not
 volatile static ButtState center_button_pos = OPEN;
+
+volatile static bool receiving_sync = false;
+volatile static bool received_sync_pulse = false;
+volatile static bool received_clock_stop = false;
+volatile static bool received_clock_start = false;
 
 // tempo that is used. This is overridden by MIDI sync clicks from DAW
 static uint8_t custom_tempo = 120;
@@ -206,6 +211,7 @@ void start_stop_playback(bool start){
 
 
 void keep_time(){
+    // manage the playback state when controlled from the device
     unsigned long now;
     static unsigned long last_downbeat_time;
 
@@ -248,6 +254,42 @@ void keep_time(){
     }
 }
 
+// manages tasks related to incoming sync messages
+void handle_sync_flags(){
+    // clock started
+    if(received_clock_start){
+        Serial.printf("Clock start (sync)\n");
+        measure_counter = BEAT_NONE;
+        sync_pulses = 0;
+        receiving_sync = true;
+        // if it's already playing using internal clock, stop that and use the sync messages instead
+        if (get_playback_state() != PLAYBACK_IDLE){
+            start_stop_playback(false);
+            // let the state machine finish
+            while(get_playback_state() != PLAYBACK_IDLE)
+                keep_time();
+        }
+        received_clock_start = false;
+        // Play the first beat now. Subsequent beats will be triggered by the sync pulse callbacks
+        received_sync_pulse = true;
+    }
+
+    if(received_clock_stop){
+        Serial.printf("Clock stop (sync)\n");
+        measure_counter = BEAT_NONE;
+        sync_pulses = 0;
+        receiving_sync = false;
+        received_clock_stop = false;
+    }
+
+    if(received_sync_pulse){
+        next_pulse();
+        received_sync_pulse = false;
+    }
+
+}
+
+
 void next_pulse(){
 
     // Serial.printf("beat (%d)\n", sync_pulses);
@@ -255,13 +297,13 @@ void next_pulse(){
     if (sync_pulses == 0 || sync_pulses == 12 || sync_pulses == 24){
         leds_show_playback(beats, channel, measure_counter);
         send_midi_notes(measure_counter);
-        // Serial.printf("measure_counter (%d)\n", measure_counter);
+        Serial.printf("measure_counter (%d)\n", measure_counter);
         measure_counter++;
     }
 
     // off beats
     else if (sync_pulses == 6+swing_offset || sync_pulses == 18+swing_offset ){
-        // Serial.printf("beat (%d)\n", sync_pulses);
+        Serial.printf("beat (%d)\n", sync_pulses);
         leds_show_playback(beats, channel, measure_counter);
         send_midi_notes(measure_counter);
         // Serial.printf("measure_counter (%d)\n", measure_counter);
@@ -323,21 +365,19 @@ void onPitchbend(uint8_t channel, uint16_t value, uint16_t timestamp)
 }
 void onClock(uint16_t timestamp)
 {
-    next_pulse();
+    // Serial.printf("Clock: (timestamp %dms)\n",timestamp);
+    received_sync_pulse = true;
+    // next_pulse();
 }
 void onClockStart(uint16_t timestamp)
 {
-    Serial.printf("Clock start (timestamp %dms)\n", timestamp);
-    measure_counter = BEAT_NONE;
-    sync_pulses = 0;
-    next_pulse();
+    Serial.printf("Clock start: (timestamp %dms)\n",timestamp);
+    received_clock_start = true;
 }
-
 void onClockStop(uint16_t timestamp)
 {
-    Serial.printf("Clock stop (timestamp %dms)\n", timestamp);
-    measure_counter = BEAT_NONE;
-    sync_pulses = 0;
+    Serial.printf("Clock stop: (timestamp %dms)\n",timestamp);
+    received_clock_stop = true;
 }
 
 /*************************************************************************** */
@@ -345,6 +385,12 @@ void onClockStop(uint16_t timestamp)
 /*************************************************************************** */
 
 void onStartButtonRelease() {
+    // if receiving click track, start/stop button is disabled
+    if (receiving_sync){
+        sev_seg_display_word(SEG_SYNC);
+        Serial.printf("Can't start - syncing\n");
+        return;
+    }
 
     if (get_playback_state() == PLAYBACK_IDLE){
         start_stop_playback(START);
@@ -484,7 +530,7 @@ void setup() {
   BLEMidiServer.setMidiStartCallback(onClockStart);
   BLEMidiServer.setMidiStopCallback(onClockStop);
   
-//   BLEMidiServer.enableDebugging();
+  BLEMidiServer.enableDebugging();
 
   // initialize buttons
   for (Button& button : buttons) {
@@ -515,6 +561,8 @@ void loop() {
   updateButtons(buttons, NUM_BUTTONS);
   rotary_loop();
   keep_time();
+  handle_sync_flags();
+  led_tasks();
 }
 
 

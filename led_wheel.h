@@ -5,6 +5,7 @@
 #include <FastLED.h>
 
 void init_leds();
+void led_tasks();
 
 void leds_show_playback(bool (*beatsarray)[MAX_BEATS], int chan, int beatnum);
 
