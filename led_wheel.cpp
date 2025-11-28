@@ -1,6 +1,7 @@
 #include "led_wheel.h"
 #include "globals.h"
 #include <Arduino.h>
+#include <array>
 
 #define MIN_UPDATE_INTERVAL 30
 
@@ -46,10 +47,10 @@ void led_tasks(){
     }
 }
 
-void leds_show_beats(bool (*beatsarray)[MAX_BEATS], int chan){
+void leds_show_beats(const std::array<bool,MAX_BEATS>& beatsarray, int chan){
     // light up selected beats, turn off unselected
     for (int i=0; i<NUM_LEDS; i++){
-        if (beatsarray[chan][i]){
+        if (beatsarray[i]){
             rgbleds[i] = chan_colors[chan];
         } else {
             rgbleds[i] = CRGB::Black;

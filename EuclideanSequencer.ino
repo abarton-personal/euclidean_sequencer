@@ -4,6 +4,8 @@
 #include "input_listener.h"
 #include "globals.h"
 #include "led_wheel.h"
+#include <vector>
+#include <array>
 using namespace std;
 
 /*************************************************************************** */
@@ -17,6 +19,7 @@ static uint8_t max_channels = 4;
 volatile static modes device_mode = EUCLIDEAN;
 // certain actions depend on whether the center button is held down or not
 volatile static ButtState center_button_pos = OPEN;
+volatile static ButtState channel_button_pos = OPEN;
 
 volatile static bool receiving_sync = false;
 volatile static bool received_sync_pulse = false;
@@ -42,7 +45,8 @@ static bool stop_playback_fl = false;
 // how many beats are currently "on" for each channel
 static uint8_t num_beats[MAX_MAX_CHANNEL] = {0};
 // 2D array to hold the on and off beats for each channel
-static bool beats[MAX_MAX_CHANNEL][MAX_BEATS] = {{false}};
+// static bool beats[MAX_MAX_CHANNEL][MAX_BEATS] = {{false}};
+vector<array<bool,MAX_BEATS>> beats;
 
 // whether each channel is a different MIDI channel, or dif
 static midi_chan_split_type midi_chan_split = NOTE_PER_CHAN;
@@ -73,19 +77,26 @@ void cycle_device_mode(){
   device_mode = static_cast<modes>((device_mode + 1) % NUM_MODES);
 }
 
+// fill beats vector with 4 bool arrays of size 16, all false
+void init_beats_array(){
+    for (int i = 0; i < max_channels; i++){
+        beats.push_back({});
+    }
+}
+
 // debug print the array beats[chan]
 void print_beats(uint8_t chan){
-    leds_show_beats(beats, chan);
+    leds_show_beats(beats[channel], chan);
     printf("beats for channel %d: [", channel);
-    for(int i=0; i<15; i++){
+    for(int i=0; i<(MAX_BEATS-1); i++){
         printf("%d, ", beats[channel][i]);
     }
-    printf("%d]\n", beats[channel][15]);
+    printf("%d]\n", beats[channel][MAX_BEATS-1]);
 }
 
 // increment or decrement the number of beats for the current channel
 void inc_dec_beats(bool up){
-    if(up==true){
+    if(up){
         if (num_beats[channel] < MAX_BEATS){
             num_beats[channel]++;
         }
@@ -95,18 +106,33 @@ void inc_dec_beats(bool up){
             num_beats[channel]--;
         }
     }
-    euclidean(num_beats[channel], beats[channel], MAX_BEATS);
+    euclidean(num_beats[channel], beats[channel]);
     print_beats(channel);
 }
 
+void inc_dec_channel(bool up){
+    if (up){
+        if (channel < MAX_MAX_CHANNEL){
+            beats.push_back({});     
+            max_channels++;
+        }
+    } else {
+        if (channel > 1){
+            beats.pop_back();
+            max_channels--;
+        }
+    }
+    // TODO: print the channel number
+}
+
 // calculates how to space out the beats
-void euclidean(int num_points, bool* chanbeats, int size) {
+void euclidean(int num_points, array<bool,MAX_BEATS>& chanbeats) {
     // First clear the array
-    for (int i = 0; i < size; i++) {
-        chanbeats[i] = false;
+    for (auto& beat : chanbeats) {
+        beat = false;
     }
     // If num_points is 0 or greater than size, nothing to do
-    if (num_points <= 0 || num_points > size) {
+    if (num_points <= 0 || num_points > MAX_BEATS) {
         return;
     }
     // Special case for 1 point
@@ -115,14 +141,14 @@ void euclidean(int num_points, bool* chanbeats, int size) {
         return;
     }
     // Calculate the spacing between num_points
-    float spacing = (float)size / num_points;
+    float spacing = (float)MAX_BEATS / num_points;
     float position = 0;
 
     // Place each point
     for (int i = 0; i < num_points; i++) {
         // Round to nearest integer position
         int index = (int)(position + 0.5);
-        if (index >= size) index = 0;  // Wrap around if needed
+        if (index >= MAX_BEATS) index = 0;  // Wrap around if needed
 
         chanbeats[index] = true;
         position += spacing;
@@ -221,6 +247,7 @@ void keep_time(){
                 start_playback_fl = false;
             }
             break;
+
         case PLAYBACK_START:
             // play downbeat and start internal clock
             last_downbeat_time = millis();
@@ -229,6 +256,7 @@ void keep_time(){
             next_pulse();
             pbs = PLAYBACK_PLAYING;
             break;
+
         case PLAYBACK_PLAYING:
             now = millis();
             if (now - last_downbeat_time >= time_per_sync_pulse){
@@ -240,14 +268,16 @@ void keep_time(){
                 stop_playback_fl = false;
             }
             break;
+
         case PLAYBACK_STOP:
             terminate_all_midi();
             measure_counter = BEAT_NONE;
             sync_pulses = 0;
-            leds_show_beats(beats, channel);
+            leds_show_beats(beats[channel], channel);
             leds_show_measure_counter(measure_counter);
             pbs = PLAYBACK_IDLE;
             break;
+
         case PLAYBACK_OVERRIDE:
             // do nothing - clock is controlled by MIDI callbacks.
             break;
@@ -274,7 +304,7 @@ void handle_sync_flags(){
     if(received_clock_stop){
         // hide measure counter light
         leds_show_measure_counter(BEAT_NONE);
-        leds_show_beats(beats, channel);
+        leds_show_beats(beats[channel], channel);
         receiving_sync = false;
         received_clock_stop = false;
     }
@@ -290,7 +320,7 @@ void setMeasureCounter(uint16_t position){
     if (get_playback_state() == PLAYBACK_IDLE && !receiving_sync){
         measure_counter = position;
         sync_pulses = (position * 6) % PPQN;
-        leds_show_beats(beats, channel);
+        leds_show_beats(beats[channel], channel);
         leds_show_measure_counter(measure_counter);
     }
 }
@@ -300,7 +330,7 @@ void next_pulse(){
     // Serial.printf("beat (%d)\n", sync_pulses);
     // downbeat and 8th notes
     if (sync_pulses == 0 || sync_pulses == (PPQN/2) || sync_pulses == PPQN){
-        leds_show_beats(beats, channel);
+        leds_show_beats(beats[channel], channel);
         leds_show_measure_counter(measure_counter);
         send_midi_notes(measure_counter);
         // Serial.printf("measure_counter (%d)\n", measure_counter);
@@ -310,7 +340,7 @@ void next_pulse(){
     // off beats
     else if (sync_pulses == (PPQN/4)+swing_offset || sync_pulses == (PPQN*3/4)+swing_offset ){
         // Serial.printf("beat (%d)\n", sync_pulses);
-        leds_show_beats(beats, channel);
+        leds_show_beats(beats[channel], channel);
         leds_show_measure_counter(measure_counter);
         send_midi_notes(measure_counter);
         // Serial.printf("measure_counter (%d)\n", measure_counter);
@@ -438,8 +468,12 @@ void onModeButtonRelease() {
     }
 }
 
+void onChannelButtonPress() {
+    channel_button_pos = CLOSED;
+}
+
 void onChannelButtonRelease() {
-    Serial.printf("Channel (brown)\n");
+    channel_button_pos = OPEN;
     if(channel >= (max_channels-1)){
       channel = 0;
     } else {
@@ -450,12 +484,10 @@ void onChannelButtonRelease() {
 }
 
 void onCenterButtonPress(){
-    Serial.printf("Center (press)\n");
     center_button_pos = CLOSED;
 }
 
 void onCenterButtonRelease() {
-    Serial.printf("Center (release)\n");
     center_button_pos = OPEN;
 }
 
@@ -464,6 +496,8 @@ void onEncoderUpDown(bool direction){
         case EUCLIDEAN:
             if (center_button_pos == CLOSED)
                 rotate_beats(direction);
+            else if (channel_button_pos == CLOSED)
+                inc_dec_channel(direction);
             else
                 inc_dec_beats(direction);
             break;
@@ -486,59 +520,61 @@ void onEncoderUpDown(bool direction){
 /*************************************************************************** */
 
 void setup() {
-  // Serial
-  Serial.begin(115200);
 
-  // initialize MIDI listener
-  BLEMidiServer.begin("Euclidean Sequencer");
-  BLEMidiServer.setOnConnectCallback([]() {
-    Serial.println("Connected");
-  });
-  BLEMidiServer.setOnDisconnectCallback([]() {
-    Serial.println("Disconnected");
-  });
-  BLEMidiServer.setNoteOnCallback(onNoteOn);
-  BLEMidiServer.setNoteOffCallback(onNoteOff);
-  BLEMidiServer.setAfterTouchPolyCallback(onAfterTouchPoly);
-  BLEMidiServer.setControlChangeCallback(onControlChange);
-  BLEMidiServer.setProgramChangeCallback(onProgramChange);
-  BLEMidiServer.setAfterTouchCallback(onAfterTouch);
-  BLEMidiServer.setPitchBendCallback(onPitchbend);
-  BLEMidiServer.setMidiPositionCallback(onPosition);
-  BLEMidiServer.setMidiClockCallback(onClock);
-  BLEMidiServer.setMidiStartCallback(onClockStart);
-  BLEMidiServer.setMidiContinueCallback(onClockContinue);
-  BLEMidiServer.setMidiStopCallback(onClockStop);
-//   BLEMidiServer.enableDebugging();
+    init_beats_array();
+    // Serial
+    Serial.begin(115200);
 
-  // initialize buttons
-  buttons_init();
-  registerButtonCallbacks(CHANNEL_BUTTON,     NULL,                 onChannelButtonRelease);
-  registerButtonCallbacks(START_STOP_BUTTON,  NULL,                 onStartButtonRelease);
-  registerButtonCallbacks(MODE_BUTTON,        NULL,                 onModeButtonRelease);
-  registerButtonCallbacks(CENTER_BUTTON,      onCenterButtonPress,  onCenterButtonRelease);
-  // initialize encoder
-  rotary_encoder_init();
-  registerEncTurnCallback(onEncoderUpDown);
+    // initialize MIDI listener
+    BLEMidiServer.begin("Euclidean Sequencer");
+    BLEMidiServer.setOnConnectCallback([]() {
+        Serial.println("Connected");
+    });
+    BLEMidiServer.setOnDisconnectCallback([]() {
+        Serial.println("Disconnected");
+    });
+    BLEMidiServer.setNoteOnCallback(onNoteOn);
+    BLEMidiServer.setNoteOffCallback(onNoteOff);
+    BLEMidiServer.setAfterTouchPolyCallback(onAfterTouchPoly);
+    BLEMidiServer.setControlChangeCallback(onControlChange);
+    BLEMidiServer.setProgramChangeCallback(onProgramChange);
+    BLEMidiServer.setAfterTouchCallback(onAfterTouch);
+    BLEMidiServer.setPitchBendCallback(onPitchbend);
+    BLEMidiServer.setMidiPositionCallback(onPosition);
+    BLEMidiServer.setMidiClockCallback(onClock);
+    BLEMidiServer.setMidiStartCallback(onClockStart);
+    BLEMidiServer.setMidiContinueCallback(onClockContinue);
+    BLEMidiServer.setMidiStopCallback(onClockStop);
+    //   BLEMidiServer.enableDebugging();
 
-  // initialize seven segment display
-  delay(100);
-  sev_seg_power(false);
-  delay(100);
-  sev_seg_power(true);
+    // initialize buttons
+    buttons_init();
+    registerButtonCallbacks(CHANNEL_BUTTON,     onChannelButtonPress, onChannelButtonRelease);
+    registerButtonCallbacks(START_STOP_BUTTON,  NULL,                 onStartButtonRelease);
+    registerButtonCallbacks(MODE_BUTTON,        NULL,                 onModeButtonRelease);
+    registerButtonCallbacks(CENTER_BUTTON,      onCenterButtonPress,  onCenterButtonRelease);
+    // initialize encoder
+    rotary_encoder_init();
+    registerEncTurnCallback(onEncoderUpDown);
 
-  // initialize LED wheel
-  init_leds();
+    // initialize seven segment display
+    delay(100);
+    sev_seg_power(false);
+    delay(100);
+    sev_seg_power(true);
+
+    // initialize LED wheel
+    init_leds();
 
 }
 
 
 void loop() {
-  updateButtons();
-  rotary_loop();
-  keep_time();
-  handle_sync_flags();
-  led_tasks();
+    updateButtons();
+    rotary_encoder_loop();
+    keep_time();
+    handle_sync_flags();
+    led_tasks();
 }
 
 
@@ -547,12 +583,7 @@ void loop() {
 
 // TODO:
 // 1. clean up a little. MIDI and clock stuff can maybe go in its own file. standardize naming conventions.
-// 2. sync with clock in
-// 3. beats should be int velocity instead of on/off bools
-// 4. manual velocity mode
-// 5. test a USB MIDI library - can't find one. BLE it is.
-// 6. shuffle mode
+// 3. beats could be int velocity instead of on/off bools
+// 4. manual velocity mode ?
 // 7. Store multiple measures?
-// 8. wire and test leds - different color per channel, beat tracer
-// 9. at startup clear LEDs and do a little dance
 // 10. multi channel or multi note toggle

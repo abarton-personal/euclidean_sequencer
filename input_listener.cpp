@@ -46,7 +46,7 @@ void rotary_encoder_init(){
 }
 
 // repeatedly check encoder for changes
-void rotary_loop()
+void rotary_encoder_loop()
 {
     int16_t encoderDelta = rotaryEncoder.encoderChanged();
     if (encoderDelta == 0)

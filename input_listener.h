@@ -30,6 +30,6 @@ void registerEncTurnCallback(encoderCallback callback);
 void registerButtonCallbacks(uint8_t pin, ButtonCallback onPress, ButtonCallback onRelease);
 
 void rotary_encoder_init();
-void rotary_loop();
+void rotary_encoder_loop();
 
 #endif // INPUT_LISTENER_H
