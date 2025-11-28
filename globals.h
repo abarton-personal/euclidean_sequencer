@@ -24,10 +24,6 @@
 
 #define DIRECTION_UP        true
 #define DIRECTION_DOWN      false
-#define INCREMENT           true
-#define DECREMENT           false
-#define START               true
-#define STOP                false            
 
 typedef enum modes {
     EUCLIDEAN,

@@ -75,7 +75,7 @@ void cycle_device_mode(){
 
 // debug print the array beats[chan]
 void print_beats(uint8_t chan){
-    leds_show_playback(beats, chan, measure_counter);
+    leds_show_beats(beats, chan);
     printf("beats for channel %d: [", channel);
     for(int i=0; i<15; i++){
         printf("%d, ", beats[channel][i]);
@@ -99,6 +99,7 @@ void inc_dec_beats(bool up){
     print_beats(channel);
 }
 
+// calculates how to space out the beats
 void euclidean(int num_points, bool* chanbeats, int size) {
     // First clear the array
     for (int i = 0; i < size; i++) {
@@ -197,16 +198,14 @@ void terminate_all_midi(){
 }
 
 
-void start_stop_playback(bool start){
-    if (start){
-        start_playback_fl = true;
-        Serial.printf("starting playback\n");
-    }
-    else {
-        stop_playback_fl = true;
-        Serial.printf("stopping playback\n");
-    }
+void start_playback(){
+    start_playback_fl = true;
+    Serial.printf("starting playback\n");
+}
 
+void stop_playback(){
+    stop_playback_fl = true;
+    Serial.printf("stopping playback\n");
 }
 
 
@@ -245,7 +244,8 @@ void keep_time(){
             terminate_all_midi();
             measure_counter = BEAT_NONE;
             sync_pulses = 0;
-            leds_show_playback(beats, channel, measure_counter);
+            leds_show_beats(beats, channel);
+            leds_show_measure_counter(measure_counter);
             pbs = PLAYBACK_IDLE;
             break;
         case PLAYBACK_OVERRIDE:
@@ -258,13 +258,10 @@ void keep_time(){
 void handle_sync_flags(){
     // clock started
     if(received_clock_start){
-        // Serial.printf("Clock start (sync)\n");
-        measure_counter = 0;
-        sync_pulses = 0;
         receiving_sync = true;
         // if it's already playing using internal clock, stop that and use the sync messages instead
         if (get_playback_state() != PLAYBACK_IDLE){
-            start_stop_playback(false);
+            stop_playback();
             // let the state machine finish
             while(get_playback_state() != PLAYBACK_IDLE)
                 keep_time();
@@ -275,9 +272,9 @@ void handle_sync_flags(){
     }
 
     if(received_clock_stop){
-        // Serial.printf("Clock stop (sync)\n");
-        measure_counter = BEAT_NONE;
-        sync_pulses = 0;
+        // hide measure counter light
+        leds_show_measure_counter(BEAT_NONE);
+        leds_show_beats(beats, channel);
         receiving_sync = false;
         received_clock_stop = false;
     }
@@ -289,30 +286,40 @@ void handle_sync_flags(){
 
 }
 
+void setMeasureCounter(uint16_t position){
+    if (get_playback_state() == PLAYBACK_IDLE && !receiving_sync){
+        measure_counter = position;
+        sync_pulses = (position * 6) % PPQN;
+        leds_show_beats(beats, channel);
+        leds_show_measure_counter(measure_counter);
+    }
+}
 
 void next_pulse(){
 
     // Serial.printf("beat (%d)\n", sync_pulses);
     // downbeat and 8th notes
-    if (sync_pulses == 0 || sync_pulses == 12 || sync_pulses == 24){
-        leds_show_playback(beats, channel, measure_counter);
+    if (sync_pulses == 0 || sync_pulses == (PPQN/2) || sync_pulses == PPQN){
+        leds_show_beats(beats, channel);
+        leds_show_measure_counter(measure_counter);
         send_midi_notes(measure_counter);
         // Serial.printf("measure_counter (%d)\n", measure_counter);
         measure_counter++;
     }
 
     // off beats
-    else if (sync_pulses == 6+swing_offset || sync_pulses == 18+swing_offset ){
+    else if (sync_pulses == (PPQN/4)+swing_offset || sync_pulses == (PPQN*3/4)+swing_offset ){
         // Serial.printf("beat (%d)\n", sync_pulses);
-        leds_show_playback(beats, channel, measure_counter);
+        leds_show_beats(beats, channel);
+        leds_show_measure_counter(measure_counter);
         send_midi_notes(measure_counter);
         // Serial.printf("measure_counter (%d)\n", measure_counter);
         measure_counter++;
     }
 
     sync_pulses++;
-    if(sync_pulses >= 24){
-        sync_pulses -= 24;
+    if(sync_pulses >= PPQN){
+        sync_pulses -= PPQN;
         if(measure_counter >= MAX_BEATS-1){
             measure_counter = 0;
         }
@@ -369,6 +376,7 @@ void onPitchbend(uint8_t channel, uint16_t value, uint16_t timestamp)
 void onPosition(uint16_t position, uint16_t timestamp)
 {
     Serial.printf("Position pointer : position %d (timestamp %dms)\n", position, timestamp);
+    setMeasureCounter(position % MAX_BEATS);
 }
 void onClock(uint16_t timestamp)
 {
@@ -403,17 +411,14 @@ void onStartButtonRelease() {
     }
 
     if (get_playback_state() == PLAYBACK_IDLE){
-        start_stop_playback(START);
-        Serial.printf("Start (orange)\n");
+        start_playback();
     }
     else if (get_playback_state() == PLAYBACK_PLAYING){
-        start_stop_playback(STOP);
-        Serial.printf("Stop (orange)\n");
+        stop_playback();
     }
 }
 
 void onModeButtonRelease() {
-    Serial.printf("Mode (blue)\n");
     cycle_device_mode();
     switch(device_mode){
         case EUCLIDEAN:

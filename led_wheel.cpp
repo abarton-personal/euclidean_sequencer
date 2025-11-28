@@ -46,7 +46,7 @@ void led_tasks(){
     }
 }
 
-void leds_show_playback(bool (*beatsarray)[MAX_BEATS], int chan, int beatnum){
+void leds_show_beats(bool (*beatsarray)[MAX_BEATS], int chan){
     // light up selected beats, turn off unselected
     for (int i=0; i<NUM_LEDS; i++){
         if (beatsarray[chan][i]){
@@ -55,10 +55,13 @@ void leds_show_playback(bool (*beatsarray)[MAX_BEATS], int chan, int beatnum){
             rgbleds[i] = CRGB::Black;
         }
     }
-    // also light up the current beat in the measure
+    change_requested = true;
+}
+
+void leds_show_measure_counter(int beatnum){
+    // light up the current beat in the measure
     if (beatnum >= 0 && beatnum < MAX_BEATS)
         rgbleds[beatnum] = CRGB::White;
-    // FastLED.show();
     change_requested = true;
 }
 
