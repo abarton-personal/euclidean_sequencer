@@ -1,28 +1,37 @@
 // input_listener.cpp
 #include "input_listener.h"
-#include "globals.h"
 #include "AiEsp32RotaryEncoder.h"
-#include "Arduino.h"
+
 
 #define DEBOUNCE_TIME               50
 
 #define ROTARY_ENCODER_A_PIN        ENCODER_A
 #define ROTARY_ENCODER_B_PIN        ENCODER_B
 #define ROTARY_ENCODER_BUTTON_PIN   CENTER_BUTTON //doesn't matter, it's controlled like the other buttons, but the encoder init expects a value
-#define ROTARY_ENCODER_VCC_PIN      -1 
+#define ROTARY_ENCODER_VCC_PIN      -1
 #define ROTARY_ENCODER_STEPS        4
 #define MAX_ENC_VAL                 15
 #define CIRCLE_ENC_VALUES           true
 
-AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, ROTARY_ENCODER_B_PIN, ROTARY_ENCODER_BUTTON_PIN, ROTARY_ENCODER_VCC_PIN, ROTARY_ENCODER_STEPS);
+AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(
+    ROTARY_ENCODER_A_PIN, ROTARY_ENCODER_B_PIN, ROTARY_ENCODER_BUTTON_PIN, 
+    ROTARY_ENCODER_VCC_PIN, ROTARY_ENCODER_STEPS
+);
 
 encoderCallback enc_callback = NULL;
 
+Button buttons[NUM_BUTTONS] = {
+    {CHANNEL_BUTTON,    OPEN, 0, NULL, NULL},
+    {START_STOP_BUTTON, OPEN, 0, NULL, NULL},
+    {MODE_BUTTON,       OPEN, 0, NULL, NULL},
+    {CENTER_BUTTON,     OPEN, 0, NULL, NULL}
+};
+
 
 /*************************************************************************** */
-/* FUNCTION DEFINITIONS                                                      */
+/* ENCODER FUNCTION DEFINITIONS                                              */
 /*************************************************************************** */
-// ISR for encoder 
+// ISR for encoder
 void IRAM_ATTR readEncoderISR()
 {
 	rotaryEncoder.readEncoder_ISR();
@@ -36,7 +45,7 @@ void rotary_encoder_init(){
     rotaryEncoder.setAcceleration(0);
 }
 
-// repeatedly check encoder for changes 
+// repeatedly check encoder for changes
 void rotary_loop()
 {
     int16_t encoderDelta = rotaryEncoder.encoderChanged();
@@ -52,13 +61,33 @@ void rotary_loop()
             enc_callback(DIRECTION_DOWN);
         }
     }
-
 }
 
 void registerEncTurnCallback(encoderCallback callback) {
     enc_callback = callback;
 }
 
+
+/*************************************************************************** */
+/* BUTTON FUNCTION DEFINITIONS                                               */
+/*************************************************************************** */
+
+void buttons_init(){
+    // set all buttons as input, with pullup resistor
+    for (Button& button : buttons) {
+        pinMode(button.pin, INPUT_PULLUP);
+    }
+}
+
+void registerButtonCallbacks(uint8_t pin, ButtonCallback onPress, ButtonCallback onRelease){
+    for (Button& b : buttons){
+        if (pin == b.pin){
+            b.pressCallback = onPress;
+            b.releaseCallback = onRelease;
+            return;
+        }
+    }
+}
 
 // BUTTON STUFF
 void updateButton(Button& button) {
@@ -70,6 +99,7 @@ void updateButton(Button& button) {
                 button.timer = currentTime;
             }
             break;
+
         case PRESS_DEBOUNCE:
             if (currentTime - button.timer >= DEBOUNCE_TIME) {
                 if (digitalRead(button.pin) == LOW) {
@@ -82,12 +112,14 @@ void updateButton(Button& button) {
                 }
             }
             break;
+
         case CLOSED:
             if (digitalRead(button.pin) == HIGH) {
                 button.state = RELEASE_DEBOUNCE;
                 button.timer = currentTime;
             }
             break;
+
         case RELEASE_DEBOUNCE:
             if (currentTime - button.timer >= DEBOUNCE_TIME) {
                 if (digitalRead(button.pin) == HIGH) {
@@ -103,8 +135,8 @@ void updateButton(Button& button) {
     }
 }
 
-void updateButtons(Button* buttons, size_t numButtons) {
-    for (size_t i = 0; i < numButtons; ++i) {
+void updateButtons() {
+    for (size_t i = 0; i < NUM_BUTTONS; ++i) {
         updateButton(buttons[i]);
     }
 }

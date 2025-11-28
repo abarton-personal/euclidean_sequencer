@@ -3,6 +3,7 @@
 #define INPUT_LISTENER_H
 
 #include <Arduino.h>
+#include "globals.h"
 
 enum ButtState {
     OPEN,
@@ -21,12 +22,12 @@ struct Button {
     ButtonCallback releaseCallback;
 };
 
-
-void updateButtons(Button* buttons, size_t numButtons);
-
+void buttons_init();
+void updateButtons();
 
 typedef void (*encoderCallback)(bool);
 void registerEncTurnCallback(encoderCallback callback);
+void registerButtonCallbacks(uint8_t pin, ButtonCallback onPress, ButtonCallback onRelease);
 
 void rotary_encoder_init();
 void rotary_loop();

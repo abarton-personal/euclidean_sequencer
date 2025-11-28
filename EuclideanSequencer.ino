@@ -116,13 +116,13 @@ void euclidean(int num_points, bool* chanbeats, int size) {
     // Calculate the spacing between num_points
     float spacing = (float)size / num_points;
     float position = 0;
-    
+
     // Place each point
     for (int i = 0; i < num_points; i++) {
         // Round to nearest integer position
         int index = (int)(position + 0.5);
         if (index >= size) index = 0;  // Wrap around if needed
-        
+
         chanbeats[index] = true;
         position += spacing;
     }
@@ -201,12 +201,12 @@ void start_stop_playback(bool start){
     if (start){
         start_playback_fl = true;
         Serial.printf("starting playback\n");
-    } 
+    }
     else {
         stop_playback_fl = true;
         Serial.printf("stopping playback\n");
     }
-    
+
 }
 
 
@@ -391,7 +391,7 @@ void onClockStop(uint16_t timestamp)
 }
 
 /*************************************************************************** */
-/* BUTTON CALLBACKS                                                          */
+/* BUTTON/ENCODER CALLBACKS                                                  */
 /*************************************************************************** */
 
 void onStartButtonRelease() {
@@ -454,16 +454,12 @@ void onCenterButtonRelease() {
     center_button_pos = OPEN;
 }
 
-/*************************************************************************** */
-/* ENCODER MOVEMENT CALLBACKS                                                */
-/*************************************************************************** */
-
 void onEncoderUpDown(bool direction){
     switch(device_mode){
         case EUCLIDEAN:
             if (center_button_pos == CLOSED)
                 rotate_beats(direction);
-            else 
+            else
                 inc_dec_beats(direction);
             break;
         case MANUAL_VELOCITY:
@@ -478,19 +474,6 @@ void onEncoderUpDown(bool direction){
             Serial.printf("Error: invalid mode\n");
     }
 }
-
-
-
-/*************************************************************************** */
-/* BUTTONS (TODO: this should just go in input_listener, except the callbacks) */
-/*************************************************************************** */
-
-Button buttons[NUM_BUTTONS] = {
-    {CHANNEL_BUTTON,    OPEN, 0, NULL,                  onChannelButtonRelease},
-    {START_STOP_BUTTON, OPEN, 0, NULL,                  onStartButtonRelease},
-    {MODE_BUTTON,       OPEN, 0, NULL,                  onModeButtonRelease},
-    {CENTER_BUTTON,     OPEN, 0, onCenterButtonPress,   onCenterButtonRelease}
-};
 
 
 /*************************************************************************** */
@@ -521,17 +504,14 @@ void setup() {
   BLEMidiServer.setMidiStartCallback(onClockStart);
   BLEMidiServer.setMidiContinueCallback(onClockContinue);
   BLEMidiServer.setMidiStopCallback(onClockStop);
-  
 //   BLEMidiServer.enableDebugging();
 
   // initialize buttons
-  for (Button& button : buttons) {
-      pinMode(button.pin, INPUT_PULLUP);
-  }
-  pinMode(CHANNEL_BUTTON, INPUT);
-  pinMode(START_STOP_BUTTON, INPUT);
-  pinMode(MODE_BUTTON, INPUT);
-  pinMode(CENTER_BUTTON, INPUT);
+  buttons_init();
+  registerButtonCallbacks(CHANNEL_BUTTON,     NULL,                 onChannelButtonRelease);
+  registerButtonCallbacks(START_STOP_BUTTON,  NULL,                 onStartButtonRelease);
+  registerButtonCallbacks(MODE_BUTTON,        NULL,                 onModeButtonRelease);
+  registerButtonCallbacks(CENTER_BUTTON,      onCenterButtonPress,  onCenterButtonRelease);
   // initialize encoder
   rotary_encoder_init();
   registerEncTurnCallback(onEncoderUpDown);
@@ -542,13 +522,14 @@ void setup() {
   delay(100);
   sev_seg_power(true);
 
+  // initialize LED wheel
   init_leds();
-  
+
 }
 
 
 void loop() {
-  updateButtons(buttons, NUM_BUTTONS);
+  updateButtons();
   rotary_loop();
   keep_time();
   handle_sync_flags();
@@ -568,5 +549,5 @@ void loop() {
 // 6. shuffle mode
 // 7. Store multiple measures?
 // 8. wire and test leds - different color per channel, beat tracer
-// 9. at startup clear LEDs and do a little dance 
+// 9. at startup clear LEDs and do a little dance
 // 10. multi channel or multi note toggle
