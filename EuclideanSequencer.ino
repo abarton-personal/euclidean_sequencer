@@ -458,47 +458,27 @@ void onCenterButtonRelease() {
 /* ENCODER MOVEMENT CALLBACKS                                                */
 /*************************************************************************** */
 
-void onEncoderUp(){
+void onEncoderUpDown(bool direction){
     switch(device_mode){
         case EUCLIDEAN:
             if (center_button_pos == CLOSED)
-                rotate_beats(INCREMENT);
+                rotate_beats(direction);
             else 
-                inc_dec_beats(INCREMENT);
+                inc_dec_beats(direction);
             break;
         case MANUAL_VELOCITY:
             break;
         case TEMPO:
-            increase_tempo(1);
+            increase_tempo(direction ? 1 : -1);
             break;
         case SWING:
-            increase_swing(1);
+            increase_swing(direction ? 1 : -1);
             break;
         default:
             Serial.printf("Error: invalid mode\n");
     }
 }
 
-void onEncoderDown(){
-    switch(device_mode){
-        case EUCLIDEAN:
-            if (center_button_pos == CLOSED)
-                rotate_beats(DECREMENT);
-            else 
-                inc_dec_beats(DECREMENT);
-            break;
-        case MANUAL_VELOCITY:
-            break;
-        case TEMPO:
-            increase_tempo(-1);
-            break;
-        case SWING:
-            increase_swing(-1);
-            break;
-        default:
-            Serial.printf("Error: invalid mode\n");
-    }
-}
 
 
 /*************************************************************************** */
@@ -554,8 +534,7 @@ void setup() {
   pinMode(CENTER_BUTTON, INPUT);
   // initialize encoder
   rotary_encoder_init();
-  registerEncTurnCallback(onEncoderUp, DIRECTION_UP);
-  registerEncTurnCallback(onEncoderDown, DIRECTION_DOWN);
+  registerEncTurnCallback(onEncoderUpDown);
 
   // initialize seven segment display
   delay(100);

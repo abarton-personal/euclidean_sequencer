@@ -8,7 +8,7 @@
 
 #define ROTARY_ENCODER_A_PIN        ENCODER_A
 #define ROTARY_ENCODER_B_PIN        ENCODER_B
-#define ROTARY_ENCODER_BUTTON_PIN  CENTER_BUTTON //doesn't matter, it's controlled like the other buttons, but the encoder init expects a value
+#define ROTARY_ENCODER_BUTTON_PIN   CENTER_BUTTON //doesn't matter, it's controlled like the other buttons, but the encoder init expects a value
 #define ROTARY_ENCODER_VCC_PIN      -1 
 #define ROTARY_ENCODER_STEPS        4
 #define MAX_ENC_VAL                 15
@@ -16,9 +16,7 @@
 
 AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, ROTARY_ENCODER_B_PIN, ROTARY_ENCODER_BUTTON_PIN, ROTARY_ENCODER_VCC_PIN, ROTARY_ENCODER_STEPS);
 
-encoderCallback up_callback = NULL;
-encoderCallback down_callback = NULL;
-
+encoderCallback enc_callback = NULL;
 
 
 /*************************************************************************** */
@@ -45,25 +43,20 @@ void rotary_loop()
     if (encoderDelta == 0)
         return;
     if (encoderDelta > 0){
-        if (up_callback != NULL) {
-            up_callback();
+        if (enc_callback != NULL) {
+            enc_callback(DIRECTION_UP);
         }
     }
     if (encoderDelta < 0){
-        if (down_callback != NULL) {
-            down_callback();
+        if (enc_callback != NULL) {
+            enc_callback(DIRECTION_DOWN);
         }
     }
 
 }
 
-void registerEncTurnCallback(encoderCallback callback, bool up) {
-    if (up) {
-        up_callback = callback;
-    }
-    else {
-        down_callback = callback;
-    }
+void registerEncTurnCallback(encoderCallback callback) {
+    enc_callback = callback;
 }
 
 

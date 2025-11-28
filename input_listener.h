@@ -25,9 +25,8 @@ struct Button {
 void updateButtons(Button* buttons, size_t numButtons);
 
 
-
-typedef void (*encoderCallback)();
-void registerEncTurnCallback(encoderCallback callback, bool up);
+typedef void (*encoderCallback)(bool);
+void registerEncTurnCallback(encoderCallback callback);
 
 void rotary_encoder_init();
 void rotary_loop();
