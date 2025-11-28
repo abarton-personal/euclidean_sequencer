@@ -57,7 +57,7 @@ typedef enum midi_chan_split_type {
 #define MAX_TEMPO       220
 #define MIN_TEMPO       40
 #define NUM_LEDS        MAX_BEATS
-#define BEAT_NONE       0
+#define BEAT_NONE       (MAX_BEATS + 1)  // out of range so the measure counter doesn't light up after clock stopped
 #define PPQN            24      // Pulses Per Quarter Note
 
 #define BPM_TO_MS(X)    (15000 / X)  // period = (60 s/min) * (1000 ms/s) / (tempo in bpm) / (4 subdivisions/beat)

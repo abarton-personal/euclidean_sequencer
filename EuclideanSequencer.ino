@@ -258,8 +258,8 @@ void keep_time(){
 void handle_sync_flags(){
     // clock started
     if(received_clock_start){
-        Serial.printf("Clock start (sync)\n");
-        measure_counter = BEAT_NONE;
+        // Serial.printf("Clock start (sync)\n");
+        measure_counter = 0;
         sync_pulses = 0;
         receiving_sync = true;
         // if it's already playing using internal clock, stop that and use the sync messages instead
@@ -275,7 +275,7 @@ void handle_sync_flags(){
     }
 
     if(received_clock_stop){
-        Serial.printf("Clock stop (sync)\n");
+        // Serial.printf("Clock stop (sync)\n");
         measure_counter = BEAT_NONE;
         sync_pulses = 0;
         receiving_sync = false;
@@ -297,13 +297,13 @@ void next_pulse(){
     if (sync_pulses == 0 || sync_pulses == 12 || sync_pulses == 24){
         leds_show_playback(beats, channel, measure_counter);
         send_midi_notes(measure_counter);
-        Serial.printf("measure_counter (%d)\n", measure_counter);
+        // Serial.printf("measure_counter (%d)\n", measure_counter);
         measure_counter++;
     }
 
     // off beats
     else if (sync_pulses == 6+swing_offset || sync_pulses == 18+swing_offset ){
-        Serial.printf("beat (%d)\n", sync_pulses);
+        // Serial.printf("beat (%d)\n", sync_pulses);
         leds_show_playback(beats, channel, measure_counter);
         send_midi_notes(measure_counter);
         // Serial.printf("measure_counter (%d)\n", measure_counter);
@@ -347,6 +347,9 @@ void onAfterTouchPoly(uint8_t channel, uint8_t note, uint8_t pressure, uint16_t 
 void onControlChange(uint8_t channel, uint8_t controller, uint8_t value, uint16_t timestamp)
 {
     Serial.printf("Control change : channel %d, controller %d, value %d (timestamp %dms)\n", channel, controller, value, timestamp);
+    if (controller == 0x7B){
+        Serial.printf("PANIC\n");
+    }
 }
 
 void onProgramChange(uint8_t channel, uint8_t program, uint16_t timestamp)
@@ -363,15 +366,22 @@ void onPitchbend(uint8_t channel, uint16_t value, uint16_t timestamp)
 {
     Serial.printf("Pitch bend : channel %d, value %d (timestamp %dms)\n", channel, value, timestamp);
 }
+void onPosition(uint16_t position, uint16_t timestamp)
+{
+    Serial.printf("Position pointer : position %d (timestamp %dms)\n", position, timestamp);
+}
 void onClock(uint16_t timestamp)
 {
-    // Serial.printf("Clock: (timestamp %dms)\n",timestamp);
     received_sync_pulse = true;
-    // next_pulse();
 }
 void onClockStart(uint16_t timestamp)
 {
     Serial.printf("Clock start: (timestamp %dms)\n",timestamp);
+    received_clock_start = true;
+}
+void onClockContinue(uint16_t timestamp)
+{
+    Serial.printf("Clock continue: (timestamp %dms)\n",timestamp);
     received_clock_start = true;
 }
 void onClockStop(uint16_t timestamp)
@@ -526,11 +536,13 @@ void setup() {
   BLEMidiServer.setProgramChangeCallback(onProgramChange);
   BLEMidiServer.setAfterTouchCallback(onAfterTouch);
   BLEMidiServer.setPitchBendCallback(onPitchbend);
+  BLEMidiServer.setMidiPositionCallback(onPosition);
   BLEMidiServer.setMidiClockCallback(onClock);
   BLEMidiServer.setMidiStartCallback(onClockStart);
+  BLEMidiServer.setMidiContinueCallback(onClockContinue);
   BLEMidiServer.setMidiStopCallback(onClockStop);
   
-  BLEMidiServer.enableDebugging();
+//   BLEMidiServer.enableDebugging();
 
   // initialize buttons
   for (Button& button : buttons) {
@@ -554,7 +566,6 @@ void setup() {
   init_leds();
   
 }
-
 
 
 void loop() {
