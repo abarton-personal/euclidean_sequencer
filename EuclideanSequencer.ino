@@ -15,7 +15,7 @@ using namespace std;
 static uint8_t channel = 0;
 // max number of channels to cycle through. This can be adjusted up to MAX_MAX_CHANNELS
 static uint8_t max_channels = 4;
-// if channel button is held down to increase max channel number, 
+// if channel button is held down to increase max channel number,
 // we don't want it to also rotate channels back to 0 after that
 static bool dont_rotate_channels = false;
 // currently active mode
@@ -56,6 +56,16 @@ static midi_chan_split_type midi_chan_split = NOTE_PER_CHAN;
 // 36 = C2 which is usually the kick drum on a drum pad
 static int base_note = 36;
 
+// FreeRTOS task handles
+static TaskHandle_t xTaskHandleSyncFlags = NULL;
+static TaskHandle_t xTaskTempLoop = NULL;
+EventGroupHandle_t xMidiSyncEventGroup;
+
+#define MIDI_START_BIT  (1 << 0)
+#define MIDI_STOP_BIT   (1 << 1)
+#define MIDI_SYNC_BIT   (1 << 2)
+
+
 /*************************************************************************** */
 /* Private Function Declarations                                             */
 /*************************************************************************** */
@@ -68,6 +78,8 @@ void send_midi_notes(uint8_t which_beat);
 void toggle_midi_chan_split();
 void next_pulse();
 playback_states get_playback_state();
+void temp_loop(void *pvParameters);
+void handle_sync_flags(void *pvParameters);
 
 
 /*************************************************************************** */
@@ -115,7 +127,7 @@ void inc_dec_beats(bool up){
 void inc_dec_max_channel(bool up){
     if (up){
         if (channel < MAX_MAX_CHANNEL){
-            beats.push_back({});     
+            beats.push_back({});
             max_channels++;
         }
     } else {
@@ -291,35 +303,47 @@ void keep_time(){
 }
 
 // manages tasks related to incoming sync messages
-void handle_sync_flags(){
-    // clock started
-    if(received_clock_start){
-        receiving_sync = true;
-        // if it's already playing using internal clock, stop that and use the sync messages instead
-        if (get_playback_state() != PLAYBACK_IDLE){
-            stop_playback();
-            // let the state machine finish
-            while(get_playback_state() != PLAYBACK_IDLE)
-                keep_time();
+void handle_sync_flags(void *pvParameters){
+    xMidiSyncEventGroup = xEventGroupCreate();
+    while (true){
+
+        // wait for a start/stop/sync ISR flag to wake this mf up
+        EventBits_t uxBits = xEventGroupWaitBits(
+            xMidiSyncEventGroup,
+            MIDI_START_BIT | MIDI_STOP_BIT | MIDI_SYNC_BIT,
+            pdTRUE,        // Clear bits on exit
+            pdFALSE,       // Wait for ANY bit
+            portMAX_DELAY
+        );
+        // check which flags were set
+
+        // clock start signal received
+        if(uxBits & MIDI_START_BIT) {
+            receiving_sync = true;
+            // if it's already playing using internal clock, stop that and use the sync messages instead
+            if (get_playback_state() != PLAYBACK_IDLE){
+                stop_playback();
+                // let the state machine finish
+                while(get_playback_state() != PLAYBACK_IDLE)
+                    keep_time();
+            }
+            // Play the first beat now. Subsequent beats will be triggered by the sync pulse callbacks
+            uxBits |= MIDI_SYNC_BIT;
         }
-        received_clock_start = false;
-        // Play the first beat now. Subsequent beats will be triggered by the sync pulse callbacks
-        received_sync_pulse = true;
-    }
 
-    if(received_clock_stop){
-        // hide measure counter light
-        leds_show_measure_counter(BEAT_NONE);
-        leds_show_beats(beats[channel], channel);
-        receiving_sync = false;
-        received_clock_stop = false;
-    }
+        // clock stop signal received
+        if(uxBits & MIDI_STOP_BIT){
+            // hide measure counter light
+            leds_show_measure_counter(BEAT_NONE);
+            leds_show_beats(beats[channel], channel);
+            receiving_sync = false;
+        }
 
-    if(received_sync_pulse){
-        next_pulse();
-        received_sync_pulse = false;
+        // clock pulse signal received
+        if(uxBits & MIDI_SYNC_BIT){
+            next_pulse();
+        }
     }
-
 }
 
 void setMeasureCounter(uint16_t position){
@@ -367,6 +391,16 @@ playback_states get_playback_state(){
     return pbs;
 }
 
+void temp_loop(void *pvParameters){
+    // To do: individual task for each of these
+    while(1){
+        updateButtons();
+        rotary_encoder_loop();
+        keep_time();
+        // handle_sync_flags();
+        led_tasks();
+    }
+}
 
 /*************************************************************************** */
 /* MIDI CALLBACKS                                                            */
@@ -416,22 +450,30 @@ void onPosition(uint16_t position, uint16_t timestamp)
 }
 void onClock(uint16_t timestamp)
 {
-    received_sync_pulse = true;
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xEventGroupSetBitsFromISR(xMidiSyncEventGroup, MIDI_SYNC_BIT, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 void onClockStart(uint16_t timestamp)
 {
     Serial.printf("Clock start: (timestamp %dms)\n",timestamp);
-    received_clock_start = true;
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xEventGroupSetBitsFromISR(xMidiSyncEventGroup, MIDI_START_BIT, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 void onClockContinue(uint16_t timestamp)
 {
     Serial.printf("Clock continue: (timestamp %dms)\n",timestamp);
-    received_clock_start = true;
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xEventGroupSetBitsFromISR(xMidiSyncEventGroup, MIDI_START_BIT, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 void onClockStop(uint16_t timestamp)
 {
     Serial.printf("Clock stop: (timestamp %dms)\n",timestamp);
-    received_clock_stop = true;
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xEventGroupSetBitsFromISR(xMidiSyncEventGroup, MIDI_STOP_BIT, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 /*************************************************************************** */
@@ -576,16 +618,27 @@ void setup() {
 
     // initialize LED wheel
     init_leds();
-
+    xTaskCreate(
+        handle_sync_flags,      // target function
+        "handle_sync_flags",    // name
+        4096,                    // stack size
+        NULL,                   // no parameters
+        5,                      // priority
+        &xTaskHandleSyncFlags   // handle
+    );
+    xTaskCreate(
+        temp_loop,       // target function
+        "temp_loop",     // name
+        4096,             // stack size
+        NULL,            // no parameters
+        2,               // priority
+        &xTaskTempLoop   // handle
+    );
 }
 
 
 void loop() {
-    updateButtons();
-    rotary_encoder_loop();
-    keep_time();
-    handle_sync_flags();
-    led_tasks();
+
 }
 
 
@@ -597,4 +650,4 @@ void loop() {
 // 3. beats could be int velocity instead of on/off bools
 // 4. manual velocity mode ?
 // 7. Store multiple measures?
-// 10. multi channel or multi note toggle
+// 10. multi channel or multi note toggle?
