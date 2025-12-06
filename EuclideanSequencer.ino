@@ -15,22 +15,25 @@ using namespace std;
 static uint8_t channel = 0;
 // max number of channels to cycle through. This can be adjusted up to MAX_MAX_CHANNELS
 static uint8_t max_channels = 4;
+// if channel button is held down to increase max channel number, 
+// we don't want it to also rotate channels back to 0 after that
+static bool dont_rotate_channels = false;
 // currently active mode
 volatile static modes device_mode = EUCLIDEAN;
 // certain actions depend on whether the center button is held down or not
 volatile static ButtState center_button_pos = OPEN;
 volatile static ButtState channel_button_pos = OPEN;
-
+// flags for handling sync signals outside of interrupt callbacks
 volatile static bool receiving_sync = false;
 volatile static bool received_sync_pulse = false;
 volatile static bool received_clock_stop = false;
 volatile static bool received_clock_start = false;
 
-// tempo that is used. This is overridden by MIDI sync clicks from DAW
+// tempo for manual playback. This is overridden by MIDI sync clicks from DAW
 static uint8_t custom_tempo = 120;
 // how much to swing. 0 is straight 16ths / no swing
 static int16_t swing_offset = 0;
-// period between beats, calculated form BPM
+// period between beats, calculated from BPM
 static uint32_t time_per_beat_ms = BPM_TO_MS(custom_tempo);
 static uint32_t time_per_sync_pulse = time_per_beat_ms / 6;
 // which of the 16 beats is being played right now
@@ -45,7 +48,6 @@ static bool stop_playback_fl = false;
 // how many beats are currently "on" for each channel
 static uint8_t num_beats[MAX_MAX_CHANNEL] = {0};
 // 2D array to hold the on and off beats for each channel
-// static bool beats[MAX_MAX_CHANNEL][MAX_BEATS] = {{false}};
 vector<array<bool,MAX_BEATS>> beats;
 
 // whether each channel is a different MIDI channel, or dif
@@ -110,7 +112,7 @@ void inc_dec_beats(bool up){
     print_beats(channel);
 }
 
-void inc_dec_channel(bool up){
+void inc_dec_max_channel(bool up){
     if (up){
         if (channel < MAX_MAX_CHANNEL){
             beats.push_back({});     
@@ -122,7 +124,11 @@ void inc_dec_channel(bool up){
             max_channels--;
         }
     }
-    // TODO: print the channel number
+    // switch immediately to the new highest channel
+    channel = max_channels - 1;
+    sev_seg_show_digit(channel);
+    print_beats(channel);
+    dont_rotate_channels = true;
 }
 
 // calculates how to space out the beats
@@ -474,6 +480,11 @@ void onChannelButtonPress() {
 
 void onChannelButtonRelease() {
     channel_button_pos = OPEN;
+    if (dont_rotate_channels){
+        dont_rotate_channels = false;
+        return;
+    }
+    // rotate to the next channel
     if(channel >= (max_channels-1)){
       channel = 0;
     } else {
@@ -497,7 +508,7 @@ void onEncoderUpDown(bool direction){
             if (center_button_pos == CLOSED)
                 rotate_beats(direction);
             else if (channel_button_pos == CLOSED)
-                inc_dec_channel(direction);
+                inc_dec_max_channel(direction);
             else
                 inc_dec_beats(direction);
             break;
