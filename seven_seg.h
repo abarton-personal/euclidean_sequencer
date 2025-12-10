@@ -48,6 +48,20 @@ const uint8_t SEG_SYNC[] = {
     SEG_A | SEG_F | SEG_E | SEG_D,                    // c
 };
 
+const uint8_t SEG_NO[] = {
+    SEG_C | SEG_E | SEG_G,                            // n
+    SEG_C | SEG_D | SEG_E | SEG_G,                    // o
+    0,
+    0
+};
+
+const uint8_t SEG_CH[] = {
+    SEG_A | SEG_F | SEG_E | SEG_D,                    // c
+    SEG_C | SEG_E | SEG_F | SEG_G,                    // h
+    0,
+    0
+};
+
 const uint8_t SEG_POOP[] = {
     SEG_A | SEG_B | SEG_E | SEG_F | SEG_G,
     SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F,
@@ -61,6 +75,7 @@ const uint8_t SEG_POOP[] = {
 
 void sev_seg_power(bool on);
 void sev_seg_show_digit(int num);
+void sev_seg_show_channel_num(int num);
 void sev_seg_display_word(const uint8_t* word);
 void demo_sev_seg();
 

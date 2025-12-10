@@ -126,7 +126,7 @@ void inc_dec_beats(bool up){
 
 void inc_dec_max_channel(bool up){
     if (up){
-        if (channel < MAX_MAX_CHANNEL){
+        if (channel < MAX_MAX_CHANNEL - 1){
             beats.push_back({});
             max_channels++;
         }
@@ -138,7 +138,7 @@ void inc_dec_max_channel(bool up){
     }
     // switch immediately to the new highest channel
     channel = max_channels - 1;
-    sev_seg_show_digit(channel);
+    sev_seg_show_channel_num(channel);
     print_beats(channel);
     dont_rotate_channels = true;
 }
@@ -532,7 +532,7 @@ void onChannelButtonRelease() {
     } else {
       channel++;
     }
-    sev_seg_show_digit(channel);
+    sev_seg_show_channel_num(channel);
     print_beats(channel);
 }
 
