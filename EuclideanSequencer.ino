@@ -60,6 +60,7 @@ static int base_note = 36;
 static TaskHandle_t xTaskHandleSyncFlags = NULL;
 static TaskHandle_t xTaskTempLoop = NULL;
 EventGroupHandle_t xMidiSyncEventGroup;
+TimerHandle_t xActivityMonitor;
 
 #define MIDI_START_BIT  (1 << 0)
 #define MIDI_STOP_BIT   (1 << 1)
@@ -402,6 +403,12 @@ void temp_loop(void *pvParameters){
     }
 }
 
+void vActivityMonitorCallback( TimerHandle_t xTimer ){
+    // if this executes, the user has not pressed any buttons for a while. Go back to EuCL mode
+    device_mode = EUCLIDEAN;
+    sev_seg_display_word(SEG_EUCL);
+}
+
 /*************************************************************************** */
 /* MIDI CALLBACKS                                                            */
 /*************************************************************************** */
@@ -502,9 +509,6 @@ void onModeButtonRelease() {
         case EUCLIDEAN:
             sev_seg_display_word(SEG_EUCL);
             break;
-        // case MANUAL_VELOCITY:
-        //     sev_seg_display_word(SEG_VOL);
-        //     break;
         case TEMPO:
             sev_seg_display_word(SEG_RATE);
             break;
@@ -514,6 +518,10 @@ void onModeButtonRelease() {
         default:
             Serial.printf("Error: invalid mode\n");
     }
+    if (device_mode != EUCLIDEAN)
+        xTimerReset(xActivityMonitor, 0);
+    else
+        xTimerStop(xActivityMonitor, 0);
 }
 
 void onChannelButtonPress() {
@@ -554,8 +562,8 @@ void onEncoderUpDown(bool direction){
             else
                 inc_dec_beats(direction);
             break;
-        case MANUAL_VELOCITY:
-            break;
+        // case MANUAL_VELOCITY:
+        //     break;
         case TEMPO:
             increase_tempo(direction ? 1 : -1);
             break;
@@ -565,6 +573,9 @@ void onEncoderUpDown(bool direction){
         default:
             Serial.printf("Error: invalid mode\n");
     }
+    // touch the activity monitor
+    if (device_mode != EUCLIDEAN)
+        xTimerReset(xActivityMonitor, 0);
 }
 
 
@@ -633,6 +644,13 @@ void setup() {
         NULL,            // no parameters
         2,               // priority
         &xTaskTempLoop   // handle
+    );
+    xActivityMonitor = xTimerCreate ( 
+        "activityMonitor",                          //name
+        pdMS_TO_TICKS(ACTIVITY_RESET_TIMEOUT_MS),   //wait time
+        pdFALSE,                                    //auto-reload
+        NULL,                                       //ID?
+        vActivityMonitorCallback                    //callback function
     );
 }
 

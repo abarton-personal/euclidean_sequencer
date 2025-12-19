@@ -58,6 +58,7 @@ typedef enum midi_chan_split_type {
 
 #define BPM_TO_MS(X)    (15000 / X)  // period = (60 s/min) * (1000 ms/s) / (tempo in bpm) / (4 subdivisions/beat)
 
+#define ACTIVITY_RESET_TIMEOUT_MS 3000
 
 
 #endif
