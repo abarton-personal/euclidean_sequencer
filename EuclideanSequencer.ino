@@ -502,9 +502,9 @@ void onModeButtonRelease() {
         case EUCLIDEAN:
             sev_seg_display_word(SEG_EUCL);
             break;
-        case MANUAL_VELOCITY:
-            sev_seg_display_word(SEG_VOL);
-            break;
+        // case MANUAL_VELOCITY:
+        //     sev_seg_display_word(SEG_VOL);
+        //     break;
         case TEMPO:
             sev_seg_display_word(SEG_RATE);
             break;
@@ -621,7 +621,7 @@ void setup() {
     xTaskCreate(
         handle_sync_flags,      // target function
         "handle_sync_flags",    // name
-        4096,                    // stack size
+        4096,                   // stack size
         NULL,                   // no parameters
         5,                      // priority
         &xTaskHandleSyncFlags   // handle
@@ -629,7 +629,7 @@ void setup() {
     xTaskCreate(
         temp_loop,       // target function
         "temp_loop",     // name
-        4096,             // stack size
+        4096,            // stack size
         NULL,            // no parameters
         2,               // priority
         &xTaskTempLoop   // handle
@@ -651,3 +651,4 @@ void loop() {
 // 4. manual velocity mode ?
 // 7. Store multiple measures?
 // 10. multi channel or multi note toggle?
+// activity monitor, return to EuCL mode after a few seconds of inactivity

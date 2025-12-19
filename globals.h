@@ -27,7 +27,7 @@
 
 typedef enum modes {
     EUCLIDEAN,
-    MANUAL_VELOCITY,
+    // MANUAL_VELOCITY,
     TEMPO,
     SWING,
     NUM_MODES   // sentinal value, not an actual mode
