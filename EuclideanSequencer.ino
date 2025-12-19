@@ -412,7 +412,16 @@ void vActivityMonitorCallback( TimerHandle_t xTimer ){
 /*************************************************************************** */
 /* MIDI CALLBACKS                                                            */
 /*************************************************************************** */
-
+void onConnect()
+{
+    Serial.printf("Bluetooth connected\n");
+    sev_seg_display_word(SEG_CONN);
+}
+void onDisconnect()
+{
+    Serial.printf("Bluetooth disconnected\n");
+    sev_seg_display_word(SEG_POOP);
+}
 void onNoteOn(uint8_t channel, uint8_t note, uint8_t velocity, uint16_t timestamp)
 {
   Serial.printf("Note on : channel %d, note %d, velocity %d (timestamp %dms)\n", channel, note, velocity, timestamp);
@@ -591,12 +600,8 @@ void setup() {
 
     // initialize MIDI listener
     BLEMidiServer.begin("Euclidean Sequencer");
-    BLEMidiServer.setOnConnectCallback([]() {
-        Serial.println("Connected");
-    });
-    BLEMidiServer.setOnDisconnectCallback([]() {
-        Serial.println("Disconnected");
-    });
+    BLEMidiServer.setOnConnectCallback(onConnect);
+    BLEMidiServer.setOnDisconnectCallback(onDisconnect);
     BLEMidiServer.setNoteOnCallback(onNoteOn);
     BLEMidiServer.setNoteOffCallback(onNoteOff);
     BLEMidiServer.setAfterTouchPolyCallback(onAfterTouchPoly);
